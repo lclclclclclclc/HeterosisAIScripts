@@ -219,6 +219,11 @@ def insert_anc_alleles (allpos,pos,hap):
             hap = np.insert(hap, insertidx, 0, axis=1)
     return pos, hap
 
+def etc_insert_anc_alleles(allpos, pos, haps):
+    new_haps = np.zeros((haps.shape[0], allpos.size))
+    insertidc = np.isin(allpos, pos)
+    new_haps[:, insertidc] = haps
+    return allpos, new_haps
 
 def calc_derived_freq (pop_hap):
     popfreq = np.sum(pop_hap, axis=0)
@@ -247,9 +252,12 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
     all_pos = np.unique(np.concatenate((p1_pos,p2_pos,p3_pos)))
 
 #TODO: etc: FYI these are slow
-    p1_pos,p1_hap = insert_anc_alleles(all_pos,p1_pos,p1_hap)
-    p2_pos,p2_hap = insert_anc_alleles(all_pos,p2_pos,p2_hap)
-    p3_pos,p3_hap = insert_anc_alleles(all_pos,p3_pos,p3_hap)
+# this is insane afaict
+# pn_pos is just the same as all_pos
+# pn_hap can be calculated in a far faster manner I think.
+    p1_pos,p1_hap = etc_insert_anc_alleles(all_pos,p1_pos,p1_hap)
+    p2_pos,p2_hap = etc_insert_anc_alleles(all_pos,p2_pos,p2_hap)
+    p3_pos,p3_hap = etc_insert_anc_alleles(all_pos,p3_pos,p3_hap)
 
 
     allpos_bin = np.linspace(0,len_genome,int(len_genome/50000)) #windows of every 50kb
@@ -324,19 +332,20 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
             Het_list.append(Het)
 
 
-            divratio = []
+            # divratio = []
+            # # for archi in range(p1_hapw.shape[0]): #iterate over 0-99 haps; 100 total)
+            # for archi in range(0, 3): # TODO: etc: put this back.  just smaller for testing p1_hapw.shape[0]): #iterate over 0-99 haps; 100 total
+            #     divarchintro = vSumFunc(p3_hapw, archi,p1_hapw)
+            #     divarchintro = divarchintro.astype("float")
+            #     divarchnonintro = vSumFunc(p2_hapw, archi,p1_hapw)
 
-            for archi in range(0, 3): # TODO: etc: put this back.  just smaller for testing p1_hapw.shape[0]): #iterate over 0-99 haps; 100 total
-                divarchintro = vSumFunc(p3_hapw, archi,p1_hapw)
-                divarchintro = divarchintro.astype("float")
-                divarchnonintro = vSumFunc(p2_hapw, archi,p1_hapw)
-
-                divarchnonintro = divarchnonintro.astype("float")
-                for comb in itertools.product(divarchintro,divarchnonintro):
-                    if comb[1] != 0:
-                        divratio.append(comb[0]/comb[1])
-            divratioavg = float(sum(divratio)) / float(len(divratio))
-            divratioavg_list.append(divratioavg)
+            #     divarchnonintro = divarchnonintro.astype("float")
+            #     for comb in itertools.product(divarchintro,divarchnonintro):
+            #         if comb[1] != 0:
+            #             divratio.append(comb[0]/comb[1])
+            # divratioavg = float(sum(divratio)) / float(len(divratio))
+            # divratioavg_list.append(divratioavg)
+            divratioavg_list.append(float('nan'))
 
 
             ArcHomoDer = (p1_freqw == 1)
