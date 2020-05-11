@@ -247,6 +247,7 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
 
     all_pos = np.unique(np.concatenate((p1_pos,p2_pos,p3_pos)))
 
+#TODO: etc: FYI these are slow
     p1_pos,p1_hap = insert_anc_alleles(all_pos,p1_pos,p1_hap)
     p2_pos,p2_hap = insert_anc_alleles(all_pos,p2_pos,p2_hap)
     p3_pos,p3_hap = insert_anc_alleles(all_pos,p3_pos,p3_hap)
@@ -546,11 +547,11 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai):
         if dominance !=2:
             temp_par = dir_stem + "slim/model0_neg.slim"  # etc: fixed script
         elif dominance == 2:
-            temp_par = dir_stem + "slim/model0_neu.txt"
+            temp_par = dir_stem + "slim/model0_neu.slim"
 
         adm_gen = 120000/nscale - 1
         end_gen = 130000/nscale
-        t_end = 10000/nscale
+        t_end = 10000/nscale  # etc: this means time from admixture to end of simulation (present)
         popsize=1000/nscale
 
 

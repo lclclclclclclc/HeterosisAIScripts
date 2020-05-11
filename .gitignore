@@ -4,3 +4,6 @@ output/
 regions/*
 
 .spyproject/
+.Rhistory
+
+python/profile_archi3.Result
