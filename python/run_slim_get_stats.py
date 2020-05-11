@@ -46,8 +46,7 @@ parser.add_argument('-d', '--hs', action="store", dest="hs_id",
                         default=0, type=int)
 parser.add_argument('-n', '--nscale', action="store", dest="nscale_id",
                         help="scaling factor index, default: 10",
-                        # default=10, type=int)  #TODO: etc: DEFAULT WAS 10
-                        default=100, type=int)
+                        default=10, type=int)
 parser.add_argument('-s', '--selcoeff', action="store", dest="selcoeff_id",
                         help="adaptive mutation selection strength index, default: 0; range: 0-1 (s=0-0.1)",
                         default=0, type=int)
@@ -327,7 +326,7 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
 
             divratio = []
 
-            for archi in range(0, p1_hapw.shape[0]): #iterate over 0-99 haps; 100 total
+            for archi in range(0, 3): # TODO: etc: put this back.  just smaller for testing p1_hapw.shape[0]): #iterate over 0-99 haps; 100 total
                 divarchintro = vSumFunc(p3_hapw, archi,p1_hapw)
                 divarchintro = divarchintro.astype("float")
                 divarchnonintro = vSumFunc(p2_hapw, archi,p1_hapw)
@@ -349,6 +348,7 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
                 Q_1_100_q90 = np.percentile(DerFreqs_NonAdm_1,90)
                 Q_1_100_max = np.max(DerFreqs_NonAdm_1)
             else:
+                #TODO: etc: hitting this case all the time?
                 Q_1_100_q95 = float('nan')
                 Q_1_100_q90 = float('nan')
                 Q_1_100_max = float('nan')
@@ -610,14 +610,15 @@ def write_to_file(windowfile_name,q):
 
 #################################################################################
 if __name__=='__main__':
+    #TODO: etc: these were originally commented out.  use to change defaults.
     whichgene = 2  #1
-    #model = 1 # 1=modelh; 0=model0 #define these two with parseargument
+    # model = 1 # 1=modelh; 0=model0 #define these two with parseargument
     #growth = 4
     #hs = 0 #0 = recessive or neutral; 1 = hs relationship
-    #dominance = 0 #run the deleterious recessive model #if 2, run the neutral model
-    #nscale = 10 #define scaling factor
-    #m4s = 0.0 #adaptive selection strength
-    #num_reps=200 #number of simulations per region
+    dominance = 2 #if 0, run the deleterious recessive model #if 2, run the neutral model
+    nscale = 100 #define scaling factor
+    m4s = 0.01 #adaptive selection strength
+    num_reps=1 #number of simulations per region
     region_all = ["chr11max","chr19region","chr3region","galnt18","hla","hyal2",
                   "krt71","nlrc5","oca2","pde6c","pou2f3","rnf34","sema6d","sgcb",
                   "sgcz","sipa1l2","slc16a11","slc19a3","slc5a10","stat2","tbx15",
@@ -631,6 +632,7 @@ if __name__=='__main__':
     DIR_tree = dir_stem + "output/trees/"
     DIR_par = dir_stem + "slim/"
 
+    # or loop over genes here I suppose
     r = int(whichgene-1)
 
 
