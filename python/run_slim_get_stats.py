@@ -396,14 +396,14 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
 
     return pos_start,pos_end,freqp4_before,freqp4_after,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list
 
-def update_par_file(region_name,temp_par, new_par,model,growth,dominance,nscale,m4s,hs,insert_ai):
+def update_par_file(region_name,temp_par, new_par,model,growth,dominance,nscale,m4s,hs,insert_ai, sex):
     oldfile = open(temp_par)
     newfile = open(new_par,'w')
     line_counter=0
     for line_counter, line in enumerate(oldfile):
         fields = line.split()
 
-        if model ==0:
+        if model ==0: # etc: only implementing sex in m0 rn
             if line_counter==1:
                 fields[1] = str(dominance)+");"
             elif line_counter==2:
@@ -412,28 +412,54 @@ def update_par_file(region_name,temp_par, new_par,model,growth,dominance,nscale,
                 fields[1] = str(m4s)+"*n);"
             elif line_counter==25:
                 fields[2] = 'readFile("' + dir_stem + 'regions/sim_seq_info_'+str(region_name)+'.txt");'
-            elif line_counter==78:
-                fields[0] = str(int(100000/nscale))
-            elif line_counter==88:
-                fields[0] = str(int(100100/nscale))
-            elif line_counter==96:
-                fields[0] = str(int(100100/nscale))+":"
-            elif line_counter==113:
-                fields[0] = str(int(110000/nscale))
-            elif line_counter==115:
-                fields[0] = str(int(110000/nscale))
-            elif line_counter==120:
-                fields[0] = str(int(119950/nscale))
-            elif line_counter==124:
-                fields[0] = str(int(120000/nscale -1))
-            elif line_counter==133:
-                fields[0] = str(int(120000/nscale))
-            elif line_counter==138:
-                fields[0] = str(int(120000/nscale +1))
-            elif line_counter==146:
-                fields[0] = str(int(130000/nscale))
-            elif line_counter==150:
-                fields[0] = 'sim.treeSeqOutput("' + dir_stem + 'output/trees/'+str(region_name)+'_m0.trees");'
+            if sex is None:
+                if line_counter==78:
+                    fields[0] = str(int(100000/nscale))
+                elif line_counter==88:
+                    fields[0] = str(int(100100/nscale))
+                elif line_counter==96:
+                    fields[0] = str(int(100100/nscale))+":"
+                elif line_counter==113:
+                    fields[0] = str(int(110000/nscale))
+                elif line_counter==115:
+                    fields[0] = str(int(110000/nscale))
+                elif line_counter==120:
+                    fields[0] = str(int(119950/nscale))
+                elif line_counter==124:
+                    fields[0] = str(int(120000/nscale -1))
+                elif line_counter==133:
+                    fields[0] = str(int(120000/nscale))
+                elif line_counter==138:
+                    fields[0] = str(int(120000/nscale +1))
+                elif line_counter==146:
+                    fields[0] = str(int(130000/nscale))
+                elif line_counter==150:
+                    fields[0] = 'sim.treeSeqOutput("' + dir_stem + 'output/trees/'+str(region_name)+'_m0_sex'+str(sex)+'.trees");'
+            elif sex is not None:
+                if line_counter == 67:  # etc. here comes initializeSex
+                    fields[1] = '"' + str(sex) + '"'
+                elif line_counter==80:
+                    fields[0] = str(int(100000/nscale))
+                elif line_counter==90:
+                    fields[0] = str(int(100100/nscale))
+                elif line_counter==98:
+                    fields[0] = str(int(100100/nscale))+":"
+                elif line_counter==115:
+                    fields[0] = str(int(110000/nscale))
+                elif line_counter==117:
+                    fields[0] = str(int(110000/nscale))
+                elif line_counter==122:
+                    fields[0] = str(int(119950/nscale))
+                elif line_counter==126:
+                    fields[0] = str(int(120000/nscale -1))
+                elif line_counter==135:
+                    fields[0] = str(int(120000/nscale))
+                elif line_counter==140:
+                    fields[0] = str(int(120000/nscale +1))
+                elif line_counter==148:
+                    fields[0] = str(int(130000/nscale))
+                elif line_counter==152:
+                    fields[0] = 'sim.treeSeqOutput("' + dir_stem + 'output/trees/'+str(region_name)+'_m0_sex'+str(sex)+'.trees");'
 
             new_line=str()
             for item in fields:
@@ -527,11 +553,10 @@ def calc_ancestry_window (ancestry_file,len_genome):
 
 
 
-def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai):
+def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex):
 
     region_name = region_all[r]
     segsize=5000000
-
 
     if model ==1:
         if dominance !=2:
@@ -552,21 +577,27 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai):
         elif growth ==4:
             popsize = 41080/nscale
 
-    if model==0:
-        if dominance !=2:
-            temp_par = dir_stem + "slim/model0_neg.slim"  # etc: fixed script
-        elif dominance == 2:
-            temp_par = dir_stem + "slim/model0_neu.slim"
+    elif model==0:
+        # etc: implementing sex only for model0 rn
+        if sex is not None:
+            if dominance !=2:
+                temp_par = dir_stem + "slim/model0_neg_sex.slim"  # etc: fixed script
+            elif dominance == 2:
+                temp_par = dir_stem + "slim/model0_neu_sex.slim"  # TODO: etc: write
+        else:
+            if dominance !=2:
+                temp_par = dir_stem + "slim/model0_neg.slim"  # etc: fixed script
+            elif dominance == 2:
+                temp_par = dir_stem + "slim/model0_neu.slim"  # etc: fixed script
 
         adm_gen = 120000/nscale - 1
         end_gen = 130000/nscale
         t_end = 10000/nscale  # etc: this means time from admixture to end of simulation (present)
         popsize=1000/nscale
 
+    new_par = DIR_par +"par_"+region_name+str(dominance)+str(model)+ str(sex)+str(n)+".txt"
 
-    new_par = DIR_par +"par_"+region_name+str(dominance)+str(model)+ str(n)+".txt"
-
-    update_par_file(region_name,temp_par, new_par,model,growth,dominance,nscale,m4s,hs,insert_ai)
+    update_par_file(region_name,temp_par, new_par,model,growth,dominance,nscale,m4s,hs,insert_ai, sex)
 
     slim_output = DIR_out +'OUT_'+region_name+str(dominance)+str(model)+ str(n)+".txt"  #TODO: etc: this is the slim output file where nothing has the line #OUT:
 
@@ -576,9 +607,10 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai):
     if model==1:
         treepath = DIR_tree + str(region_name) + '_mh.trees'
         meanp1 = calc_p1ancestry(treepath,2,popsize,t_end,model)
-        ancestry_position_writeout(treepath,n,2,popsize,t_end,region_name) #write out ancestry info
+        ancestry_position_writeout(treepath,n,2,popsize,t_end,region_name, sex) #write out ancestry info
     elif model==0:
-        treepath = DIR_tree + str(region_name) + '_m0.trees'
+        treepath = DIR_tree + str(region_name)+'_m0_sex'+str(sex)+'.trees'  # etc
+        # treepath = DIR_tree + str(region_name) + '_m0.trees'
         meanp1 = calc_p1ancestry(treepath,1,popsize,t_end,model)   #TODO: etc.  here is issue with 'n'.  just debugging?
         ancestry_position_writeout(treepath,n,1,popsize,t_end,region_name)
 
@@ -619,12 +651,14 @@ def write_to_file(windowfile_name,q):
 
 #################################################################################
 if __name__=='__main__':
+    # etc: sex param takes None, 'A', or 'X'
+    sex = 'X'
     #TODO: etc: these were originally commented out.  use to change defaults.
-    whichgene = 2  #1
+    whichgene = 15  #1
     # model = 1 # 1=modelh; 0=model0 #define these two with parseargument
     #growth = 4
     #hs = 0 #0 = recessive or neutral; 1 = hs relationship
-    dominance = 2 #if 0, run the deleterious recessive model #if 2, run the neutral model
+    dominance = 0 #if 0, run the deleterious recessive model #if 2, run the neutral model
     nscale = 100 #define scaling factor
     m4s = 0.01 #adaptive selection strength
     num_reps=1 #number of simulations per region
@@ -649,7 +683,7 @@ if __name__=='__main__':
 
     window_start,window_end=find_ai_site (DIR_region+"sim_seq_info_"+str(region_name)+".txt")
     insert_ai = int((int(window_end)+int(window_start))/2) #find the position to insert AI mutation
-    windowfile_name = dir_stem + "output/stats/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-growth"+str(growth)+"-hs"+str(hs)+"-ai"+str(m4s)+'_human_windows.txt'
+    windowfile_name = dir_stem + "output/stats/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'_human_windows.txt'
     num_proc = 10
     manager = Manager()
     pool = Pool(processes=num_proc)
@@ -660,7 +694,7 @@ if __name__=='__main__':
     for i in args_iterable:
         n=i[0]
         print(str(n))
-        run_slim_variable(i[0],i[1],r,dominance,nscale,m4s,model,growth,hs,insert_ai)
+        run_slim_variable(i[0],i[1],r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
 
     q.put('kill')
     pool.close()
