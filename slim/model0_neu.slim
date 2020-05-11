@@ -23,7 +23,7 @@ initialize() {
 	//genomic element: intergenic
 	initializeGenomicElementType("g3", c(m3), c(1.0));		
     //read in exon and recomb info
-    info_lines = readFile("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/regions/sim_seq_info_bnc2.txt");
+    info_lines = readFile("/users/egibso10/demogSP20/HeterosisAIScripts/regions/sim_seq_info_bnc2.txt");
     
 	//recombination
     rec_ends = NULL;
@@ -88,7 +88,7 @@ initialize() {
 
 10010 late() { 
 	if(m4s != 0.0){
-		sim.outputFull("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/tmp/" + simnum + ".txt"); 
+		sim.outputFull("/users/egibso10/demogSP20/HeterosisAIScripts/output/tmp/" + simnum + ".txt"); 
 		target = sample(p1.genomes, 1); 
 		target.addNewDrawnMutation(m4, 2500000); //random mutation in the middle of the segment
 	}
@@ -103,7 +103,7 @@ initialize() {
 			} 
 		} 
 		else { 
-			sim.readFromPopulationFile("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/tmp/" + simnum + ".txt"); 
+			sim.readFromPopulationFile("/users/egibso10/demogSP20/HeterosisAIScripts/output/tmp/" + simnum + ".txt"); 
 			setSeed(getSeed() + 1); 
 			target = sample(p1.genomes, 1); 
 			target.addNewDrawnMutation(m4, 2500000); 
@@ -148,7 +148,7 @@ initialize() {
 	p1.outputMSSample(100); //archaic 
 	p2.outputMSSample(100); //african 
 	p3.outputMSSample(100); //non-african 
-	sim.treeSeqOutput("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/trees/neu_m0.trees");
+	sim.treeSeqOutput("/users/egibso10/demogSP20/HeterosisAIScripts/output/trees/neu_m0.trees");
     if (m4s != 0.0){
         p4g = p3.genomes;
 		adapt = sim.mutationsOfType(m4);
