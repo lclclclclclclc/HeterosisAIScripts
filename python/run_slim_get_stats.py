@@ -599,7 +599,7 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
 
     update_par_file(region_name,temp_par, new_par,model,growth,dominance,nscale,m4s,hs,insert_ai, sex)
 
-    slim_output = DIR_out +'OUT_'+region_name+str(dominance)+str(model)+ str(n)+".txt"  #TODO: etc: this is the slim output file where nothing has the line #OUT:
+    slim_output = DIR_out +'OUT_'+region_name+str(sex)+str(m4s)+ str(n)+".txt"  #TODO: etc: this is the slim output file where nothing has the line #OUT:
 
     os.system('slim %s > %s' %(new_par ,slim_output))
 
@@ -683,7 +683,8 @@ if __name__=='__main__':
 
     window_start,window_end=find_ai_site (DIR_region+"sim_seq_info_"+str(region_name)+".txt")
     insert_ai = int((int(window_end)+int(window_start))/2) #find the position to insert AI mutation
-    windowfile_name = dir_stem + "output/stats/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'_human_windows.txt'
+    attempt_num = np.random.randint(5000)
+    windowfile_name = dir_stem + "output/stats/sexXnull_nscale100/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'attempt' + str(attempt_num) + '_human_windows.txt'
     num_proc = 10
     manager = Manager()
     pool = Pool(processes=num_proc)
