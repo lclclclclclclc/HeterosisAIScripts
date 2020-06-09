@@ -59,3 +59,5 @@ slim/par_sgcz00X9.txt
 slim/tmp.out
 
 .RData
+
+*.tmp

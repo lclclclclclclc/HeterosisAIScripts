@@ -617,16 +617,17 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
 
     pos_start,pos_end,freqp4_before,freqp4_after,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list = calc_stats(slim_output,segsize,adm_gen,end_gen)
 
+    # TODO: etc: well good thing this is exactly the same as ln 118........ :O
     ancestry_file = DIR_anc+ region_name+str(dominance)+ "_"+str(model)+ "_"+str(growth)+ "_"+str(m4s)+ "_"+str(hs) + "_"+str(n) + '.ancestry'
     anc_window = calc_ancestry_window (ancestry_file,segsize) #get mean ancestry per 50kb window
 
     q.put([n,insert_ai,growth,meanp1,pos_start,pos_end,freqp4_before,freqp4_after,anc_window, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
     #other parameter info are stored in the output file name
 
-    os.system('rm '+slim_output)
-    os.system('rm '+treepath)
-    os.system('rm '+new_par)
-    os.system('rm '+ancestry_file)
+    # os.system('rm '+slim_output)
+    # os.system('rm '+treepath)
+    # os.system('rm '+new_par)
+    # os.system('rm '+ancestry_file)
 
 
 
@@ -684,7 +685,7 @@ if __name__=='__main__':
     window_start,window_end=find_ai_site (DIR_region+"sim_seq_info_"+str(region_name)+".txt")
     insert_ai = int((int(window_end)+int(window_start))/2) #find the position to insert AI mutation
     attempt_num = np.random.randint(5000)
-    windowfile_name = dir_stem + "output/stats/sexXnull_nscale100/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'attempt' + str(attempt_num) + '_human_windows.txt'
+    windowfile_name = dir_stem + "output/stats/20200609/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'attempt' + str(attempt_num) + '_human_windows.txt'
     num_proc = 10
     manager = Manager()
     pool = Pool(processes=num_proc)
