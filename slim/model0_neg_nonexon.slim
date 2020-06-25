@@ -9,21 +9,11 @@ initialize() {
 	// importantly, SLiM computes the fitness of the heterozygote and homozygote as 1+sh and 1+s
 	// dadi and others compute it as 1+2sh and 1+2s
     initializeMutationType("m1", dominance, "g", -0.01314833*n, 0.186);
-	// initializeMutationType("m1", 0.0, "f", 0.0);
-	//synonymous -- assumed neutral here
-	initializeMutationType("m2", 0.0, "f", 0.0);
-	//noncoding -- assumed neutral here
-	initializeMutationType("m3", 0.0, "f", 0.0);
-	//beneficial -- for the time being, is left out
 	initializeMutationType("m4", 0.5, "f", 0.01*n); //adaptive 	
 	//genomic element: exon and uses a mixture of syn and nonsyn at a 1:2.31 ratio (Huber et al.)
-	initializeGenomicElementType("g1", c(m2,m1), c(1.0,2.31));
-	//genomic element: intron
-	initializeGenomicElementType("g2", c(m3), c(1.0));
-	//genomic element: intergenic
-	initializeGenomicElementType("g3", c(m3), c(1.0));		
+	initializeGenomicElementType("g1", c(m1), c(2.31));
     //read in exon and recomb info
-    info_lines = readFile("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/regions/sim_seq_info_bnc2.txt");
+    info_lines = readFile("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/regions/sim_seq_info_X_0_5M.txt");
     
 	//recombination
     rec_ends = NULL;
@@ -39,23 +29,6 @@ initialize() {
     initializeRecombinationRate(0.5*(1-(1-2*rec_rates)^n), rec_ends);
     
     //exons
-    for (line in info_lines[substr(info_lines, 0, 2) == "non"])
-    {
-        components = strsplit(line, " ");
-        exon_starts = asInteger(components[1]);
-        exon_ends = asInteger(components[2]);
-        initializeGenomicElement(g2, exon_starts, exon_ends);
-    }
-
-
-//    for (line in info_lines[substr(info_lines, 0, 2) == "cnc"])
-//    {
-//        components = strsplit(line, " ");
-//        cnc_starts = asInteger(components[1]);
-//        cnc_ends = asInteger(components[2]);
-//        initializeGenomicElement(g3, cnc_starts, cnc_ends);
-//    }
-
     for (line in info_lines[substr(info_lines, 0, 2) == "exo"])
     {
         components = strsplit(line, " ");
@@ -73,7 +46,6 @@ initialize() {
     defineConstant("simnum", getSeed());
     setSeed(getSeed() + 27126);
     sim.addSubpop("p1", asInteger(10000/n));
-    m2.convertToSubstitution = T;
 }
 
 10000 early() { // after burn-in, split populations into two: p1 and p2
