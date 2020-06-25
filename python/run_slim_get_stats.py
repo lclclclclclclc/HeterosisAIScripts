@@ -283,10 +283,10 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
 
     for w in range(1,100):  # etc: hardcoded here, but above was int(len_genome/50000)
         these_pos = all_pos[allpos_digitized==w]
-        pos_start.append(min(these_pos))
-        pos_end.append(max(these_pos))
 
         if len(these_pos)>1:
+            pos_start.append(min(these_pos))
+            pos_end.append(max(these_pos))
 
             these_pos_idx = np.nonzero(np.in1d(all_pos,these_pos))[0]
             p1_hapw = p1_hap[:,these_pos_idx]
@@ -653,20 +653,20 @@ def write_to_file(windowfile_name,q):
 #################################################################################
 if __name__=='__main__':
     # etc: sex param takes None, 'A', or 'X'
-    sex = 'X'
+    sex = 'A'
     #TODO: etc: these were originally commented out.  use to change defaults.
-    whichgene = 15  #1
+    whichgene = 15+10  #1  15 was for project.  X is 25
     # model = 1 # 1=modelh; 0=model0 #define these two with parseargument
     #growth = 4
     #hs = 0 #0 = recessive or neutral; 1 = hs relationship
     dominance = 0 #if 0, run the deleterious recessive model #if 2, run the neutral model
     nscale = 100 #define scaling factor
     m4s = 0.01 #adaptive selection strength
-    num_reps=1 #number of simulations per region
+    num_reps=10 #number of simulations per region
     region_all = ["chr11max","chr19region","chr3region","galnt18","hla","hyal2",
                   "krt71","nlrc5","oca2","pde6c","pou2f3","rnf34","sema6d","sgcb",
                   "sgcz","sipa1l2","slc16a11","slc19a3","slc5a10","stat2","tbx15",
-                  "tlr1610","tnfa1p3","txn"]
+                  "tlr1610","tnfa1p3","txn", 'X_0_5M']
 
     dir_stem = "/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/"
 
