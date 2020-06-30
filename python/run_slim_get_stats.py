@@ -141,6 +141,7 @@ def write_ancestry (DIR_tree, output_anc_file):
 
 
 def load_data_slim(file_path,len_genome,adm_gen,end_gen): # load slim's output
+# TODO: etc: why does freqp4_b/a just get overridden a bunch?.. It's zero'd out later ln. 184ish
     pos_den, hapMat_den,freqp4_before,freqp4_after = get_pos_hap(file_path,'p1',len_genome,end_gen)
     pos_afr, hapMat_afr,freqp4_before,freqp4_after = get_pos_hap(file_path,'p2',len_genome,end_gen)
     pos_nonafr, hapMat_nonafr,freqp4_before,freqp4_after = get_pos_hap(file_path,'p3',len_genome,end_gen)
@@ -180,7 +181,7 @@ def get_pos_hap(file_path,pop_id,len_genome,gen_time): #get pos and hapMat for a
                     hap = np.array(list(infile.readline())[:-1]).astype(int)
                     hap = np.delete(hap,mult_mut_pos)
                     hapMat[indiv] = hap
-                freqp4_before = 0
+                freqp4_before = 0  # why is this just zero'd?  also overwritten in load_data_slim.. but then output??
                 freqp4_after = 0
                 end=1
     infile.close()
@@ -456,6 +457,8 @@ def update_par_file(region_name,temp_par, new_par,model,growth,dominance,nscale,
                     fields[0] = str(int(120000/nscale +1))
                 elif line_counter==118:
                     fields[0] = str(int(130000/nscale))
+                elif line_counter==122:
+                    fields[0] = 'sim.treeSeqOutput("' + dir_stem + 'output/trees/'+str(region_name)+'_m0_sex'+str(sex)+'.trees");'
 
             new_line=str()
             for item in fields:
@@ -651,7 +654,7 @@ if __name__=='__main__':
     # etc: sex param takes None, 'A', or 'X'
     sex = 'A' #'A'
     #TODO: etc: these were originally commented out.  use to change defaults.
-    whichgene = 15+10  #1  15 was for project.  X is 25
+    whichgene = 14#+10  #1  15 was for project.  X is 25
     # model = 1 # 1=modelh; 0=model0 #define these two with parseargument
     #growth = 4
     #hs = 0 #0 = recessive or neutral; 1 = hs relationship
@@ -681,7 +684,7 @@ if __name__=='__main__':
     window_start,window_end=find_ai_site (DIR_region+"sim_seq_info_"+str(region_name)+".txt")
     insert_ai = int((int(window_end)+int(window_start))/2) #find the position to insert AI mutation
     attempt_num = np.random.randint(5000)
-    windowfile_name = dir_stem + "output/stats/20200625/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'attempt' + str(attempt_num) + '_human_windows.txt'
+    windowfile_name = dir_stem + "output/stats/20200630/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'attempt' + str(attempt_num) + '_human_windows.txt'
     num_proc = 10
     manager = Manager()
     pool = Pool(processes=num_proc)
