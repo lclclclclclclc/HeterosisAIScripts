@@ -665,7 +665,7 @@ if __name__=='__main__':
     region_all = ["chr11max","chr19region","chr3region","galnt18","hla","hyal2",
                   "krt71","nlrc5","oca2","pde6c","pou2f3","rnf34","sema6d","sgcb",
                   "sgcz","sipa1l2","slc16a11","slc19a3","slc5a10","stat2","tbx15",
-                  "tlr1610","tnfa1p3","txn", 'X_0_5M']
+                  "tlr1610","tnfa1p3","txn", 'X-0-5M']
 
     dir_stem = "/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/"
 
