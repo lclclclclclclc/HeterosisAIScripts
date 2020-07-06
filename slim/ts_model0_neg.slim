@@ -1,7 +1,7 @@
 initialize() {
-	defineConstant("dominance", 0); //recessive = 0; additive = 0.5; 
-	defineConstant("n", 10); //scaling factor 
-	defineConstant("m4s", 0.01*n); //if m4s>0, adaptive introgression; else, deleterious null 
+	defineConstant("dominance", 0 ); //recessive = 0; additive = 0.5; 
+	defineConstant("n", 10 ); //scaling factor 
+	defineConstant("m4s", 0.01 *n); //if m4s>0, adaptive introgression; else, deleterious null 
 	
 	// exon uses a mixture of syn and nonsyn at a 1:2.31 ratio (Huber et al.)
 	// to achieve an overall mutation rate of 1.5e-8, need 2.31/(1+2.31) fraction of all muts to be nonsyn
