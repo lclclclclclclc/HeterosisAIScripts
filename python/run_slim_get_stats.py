@@ -393,77 +393,94 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
             U_1_80_100_list.append(float('nan'))
 
 
-    return pos_start,pos_end,freqp4_before,freqp4_after,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list
+    return pos_start, pos_end, freqp4_before, freqp4_after, Dstat_list, fD_list, Het_list, divratioavg_list, Q_1_100_q95_list, Q_1_100_q90_list, Q_1_100_max_list, U_1_0_100_list, U_1_20_100_list, U_1_50_100_list, U_1_80_100_list
 
-def update_par_file(region_name,temp_par, new_par,model,growth,dominance,nscale,m4s,hs,insert_ai, sex):
+
+def update_par_file(region_name ,temp_par, new_par, model, growth, dominance,
+                    nscale, m4s, hs, insert_ai, sex):
+    region_info_filename = dir_stem + 'regions/sim_seq_info_' + str(region_name) + '.txt'
+    trees_output_filename = dir_stem + 'output/trees/'+str(region_name)+'_m0_sex'+str(sex)+'.trees'
+
     oldfile = open(temp_par)
     newfile = open(new_par,'w')
     line_counter=0
     for line_counter, line in enumerate(oldfile):
         fields = line.split()
 
-        if model ==0: # etc: only implementing sex in m0 rn
-            if line_counter==1:
-                fields[1] = str(dominance)+");"
-            elif line_counter==2:
-                fields[1] = str(nscale)+");"
-            elif line_counter==3:
-                fields[1] = str(m4s)+"*n);"
-            elif line_counter==15:
-                fields[2] = 'readFile("' + dir_stem + 'regions/sim_seq_info_'+str(region_name)+'.txt");'
-            if sex is None:
-                if line_counter==50:
-                    fields[0] = str(int(100000/nscale))
-                elif line_counter==60:
-                    fields[0] = str(int(100100/nscale))
-                elif line_counter==68:
-                    fields[0] = str(int(100100/nscale))+":"
-                elif line_counter==85:
-                    fields[0] = str(int(110000/nscale))
-                elif line_counter==87:
-                    fields[0] = str(int(110000/nscale))
-                elif line_counter==92:
-                    fields[0] = str(int(119950/nscale))
-                elif line_counter==96:
-                    fields[0] = str(int(120000/nscale -1))
-                elif line_counter==105:
-                    fields[0] = str(int(120000/nscale))
-                elif line_counter==110:
-                    fields[0] = str(int(120000/nscale +1))
-                elif line_counter==118:
-                    fields[0] = str(int(130000/nscale))
-                elif line_counter==122:
-                    fields[0] = 'sim.treeSeqOutput("' + dir_stem + 'output/trees/'+str(region_name)+'_m0_sex'+str(sex)+'.trees");'
-            elif sex is not None:
-                if line_counter == 38:  # etc. here comes initializeSex
-                    fields[1] = '"' + str(sex) + '"'
-                elif line_counter==50:
-                    fields[0] = str(int(100000/nscale))
-                elif line_counter==60:
-                    fields[0] = str(int(100100/nscale))
-                elif line_counter==68:
-                    fields[0] = str(int(100100/nscale))+":"
-                elif line_counter==85:
-                    fields[0] = str(int(110000/nscale))
-                elif line_counter==87:
-                    fields[0] = str(int(110000/nscale))
-                elif line_counter==92:
-                    fields[0] = str(int(119950/nscale))
-                elif line_counter==96:
-                    fields[0] = str(int(120000/nscale -1))
-                elif line_counter==105:
-                    fields[0] = str(int(120000/nscale))
-                elif line_counter==110:
-                    fields[0] = str(int(120000/nscale +1))
-                elif line_counter==118:
-                    fields[0] = str(int(130000/nscale))
-                elif line_counter==122:
-                    fields[0] = 'sim.treeSeqOutput("' + dir_stem + 'output/trees/'+str(region_name)+'_m0_sex'+str(sex)+'.trees");'
+        if model == 0: # etc: only implementing m0 rn
+        # TODO: include hs? and insert_ai; unify sexes and no sex
+        # TODO: calculate timepoints using adm_gen and end_gen??
+            if line_counter == 1:
+                fields[1] = str(dominance)  # irrelevant in neutral model
+            elif line_counter == 2:
+                fields[1] = str(nscale)
+            elif line_counter == 3:
+                fields[1] = str(m4s)
+            if m4s == 2:  # neutral model
+                if line_counter == 15:  # region info file
+                    fields[2] = 'readFile("' + region_info_filename + '");'
+                elif line_counter == 29:  # initializeSex
+                    if sex is None:  # comment out the call
+                        fields[0] = '// ' + fields[0]
+                    else:  # initializeSex as autosome or Xchr ("A" or "X")
+                        fields[1] = '"' + str(sex) + '"'
+                elif line_counter == 40:  # p1/p2 split
+                    fields[0] = str(int(2))
+                elif line_counter == 43:  # remember p1/p2 split
+                    fields[0] = str(int(2))
+                elif line_counter == 47:  # AI variant emerges
+                    fields[0] = str(int(100/nscale + 2))
+                elif line_counter == 50:  # locus for AI variant
+                    fields[1] = str(int(insert_ai))
+                elif line_counter == 55:  # loop to check on AI variant
+                    fields[0] = str(int(100/nscale + 2)) + ":"
+                elif line_counter == 68:  # locus for AI variant in loop
+                    fields[1] = str(int(insert_ai))
+                elif line_counter == 73:  # p2/p3 split
+                    fields[0] = str(int(10000/nscale))
+                elif line_counter == 76:  # remember p2/p3 split
+                    fields[0] = str(int(10000/nscale))
+                elif line_counter == 80:  # admixture generation early()
+                    fields[0] = str(int(20000/nscale))  # TODO: replace by adm_gen
+                elif line_counter == 90:  # admixture generation late()
+                    fields[0] = str(int(20000/nscale)) # TODO: replace by adm_gen
+                elif line_counter == 96:  # final generation
+                    fields[0] = str(int(30000/nscale))  # TODO: replace by end_gen
+                elif line_counter == 100:  # write out .trees
+                    fields[0] = 'sim.treeSeqOutput("' + trees_output_filename + '");'
 
-            new_line=str()
-            for item in fields:
-                new_line = new_line+item+" "
-            newfile.write(new_line+'\n')
+            elif m4s != 2:   # recessive deleterious "negative" background model
+                if line_counter == 23:  # region info file
+                    fields[2] = 'readFile("' + region_info_filename + '");'
+                elif line_counter == 45:  # initializeSex
+                    if sex is None:  # comment out the call
+                        fields[0] = '// ' + fields[0]
+                    else:  # initializeSex as autosome or Xchr ("A" or "X")
+                        fields[1] = '"' + str(sex) + '"'
+                elif line_counter == 57:  # p1/p2 split
+                    fields[0] = str(int(100000/nscale))
+                elif line_counter == 60:  # remember p1/p2 split
+                    fields[0] = str(int(100000/nscale))
+                elif line_counter == 64:  # AI variant emerges
+                    fields[0] = str(int(100/nscale) + int(100000/nscale))
+                elif line_counter == 67:  # locus for AI variant
+                    fields[1] = str(int(insert_ai))
+                elif line_counter == 68:  # loop to check on AI variant
+                    fields[0] = str(int(100/nscale) + int(100000/nscale))+":"
+                elif line_counter == 86:  # locus for AI variant in loop
+                    fields[1] = str(int(insert_ai))
+                elif line_counter == 91:  # p2/p3 split
+                    fields[0] = str(int(110000/nscale))
+                elif line_counter == 94:  # remember p2/p3 split
+                    fields[0] = str(int(110000/nscale))
+                elif line_counter == 98:  # admixture generation early()
+                    fields[0] = str(int(120000/nscale))  # TODO: replace by adm_gen
+                elif line_counter == 107:  # admixture generation late()
+                    fields[0] = str(int(120000/nscale))  # TODO: replace by adm_gen
+                elif line_counter == 118:  # final generation
+                    fields[0] = str(int(130000/nscale))  # TODO: replace by end_gen
+                elif line_counter == 122:  # write out .trees
+                    fields[0] = 'sim.treeSeqOutput("' + trees_output_filename + '");'
 
         elif model ==1:   #modelh
             if line_counter==1:
@@ -507,11 +524,10 @@ def update_par_file(region_name,temp_par, new_par,model,growth,dominance,nscale,
             elif line_counter==187:
                 fields[0] = 'sim.treeSeqOutput("' + dir_stem + 'output/tree/'+str(region_name)+'_mh.trees");'
 
-            new_line=str()
-            for item in fields:
-                new_line = new_line+item+" "
-            newfile.write(new_line+'\n')
-
+        new_line=str()
+        for item in fields:
+            new_line = new_line+item+" "
+        newfile.write(new_line+'\n')
 
     newfile.close()
     oldfile.close()
@@ -557,7 +573,7 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
     region_name = region_all[r]
     segsize=5000000
 
-    if model ==1:
+    if model ==1:  # etc: not handling this model yet
         if dominance != 2:
             temp_par = dir_stem + "slim/modelh_neg.txt"
         elif dominance == 2:
@@ -576,40 +592,37 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
         elif growth ==4:
             popsize = 41080/nscale
 
-    elif model==0:
-        # etc: implementing sex only for model0 rn
-        if sex is not None:
-            if dominance !=2:
-                temp_par = dir_stem + "slim/model0_neg_sex_nonexon.slim"  # etc: fixed script
-            elif dominance == 2:
-                temp_par = dir_stem + "slim/model0_neu_sex.slim"  # TODO: etc: write
-        else:
-            if dominance !=2:
-                temp_par = dir_stem + "slim/model0_neg_nonexon.slim"  # etc: fixed script
-            elif dominance == 2:
-                temp_par = dir_stem + "slim/model0_neu.slim"  # etc: fixed script
+    elif model == 0:
+        # etc: why were these timepoints not used in writing par files????
+        if dominance !=2:
+            temp_par = dir_stem + "slim/ts_model0_neg.slim"
+            adm_gen = 120000/nscale - 1
+            end_gen = 130000/nscale
+        elif dominance == 2:
+            temp_par = dir_stem + "slim/ts_model0_neu.slim"
+            # recap'ing obviates need for 10k of SLiM burn-in in neutral model
+            adm_gen = 20000/nscale - 1
+            end_gen = 30000/nscale
 
-        adm_gen = 120000/nscale - 1
-        end_gen = 130000/nscale
         t_end = 10000/nscale  # etc: this means time from admixture to end of simulation (present)
         popsize=1000/nscale
 
     new_par = DIR_par +"par_"+region_name+str(dominance)+str(model)+ str(sex)+str(n)+".txt"
 
-    update_par_file(region_name,temp_par, new_par,model,growth,dominance,nscale,m4s,hs,insert_ai, sex)
+    update_par_file(region_name, temp_par, new_par, model, growth, dominance,
+                    nscale, m4s, hs, insert_ai, sex)
 
-    slim_output = DIR_out +'OUT_'+region_name+str(sex)+str(m4s)+ str(n)+".txt"  #TODO: etc: this is the slim output file where nothing has the line #OUT:
+    # etc: this is the slim output file where nothing has the line #OUT:
+    slim_output = DIR_out +'OUT_'+region_name+str(sex)+str(m4s)+ str(n)+".txt"
 
     os.system('slim %s > %s' %(new_par ,slim_output))
 
-    # treepath = DIR_tree+str(region_name)+str(dominance)+'.trees'  etc: had to change to match ln 416/463
     if model==1:
         treepath = DIR_tree + str(region_name) + '_mh.trees'
         meanp1 = calc_p1ancestry(treepath,2,popsize,t_end,model)
         ancestry_position_writeout(treepath,n,2,popsize,t_end,region_name, sex) #write out ancestry info
     elif model==0:
         treepath = DIR_tree + str(region_name)+'_m0_sex'+str(sex)+'.trees'  # etc
-        # treepath = DIR_tree + str(region_name) + '_m0.trees'
         meanp1 = calc_p1ancestry(treepath,1,popsize,t_end,model)   #TODO: etc.  here is issue with 'n'.  just debugging?
         ancestry_position_writeout(treepath,n,1,popsize,t_end,region_name)
 
