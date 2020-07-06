@@ -42,7 +42,7 @@ initialize() {
 		neu_ends = asInteger(components[2]);
 		initializeGenomicElement(g1, neu_starts, neu_ends);
 	}
-	initializeSex( "A" ); // etc: spaces for ease of editing with line.split 
+	initializeSex( "A" ); // etc: spaces for ease of editing with line.split
 }
 
 
@@ -55,39 +55,38 @@ initialize() {
 	sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
 }
 
-100 { // after burn-in, split populations into two: p1 and p2 
+10000 { // after burn-in, split populations into two: p1 and p2 
 	sim.addSubpopSplit("p2", asInteger(10000/n), p1);
 }
-100 late() {
-	sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
-}
-
 10000 late() {
 	sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
 }
 
+
 10010 late() {
-	if(m4s != 0.0){
+	if(m4s != 0.0){  // We introduce an adaptive variant.
+		target = sample(p1.genomes, 1);
+		target.addNewDrawnMutation(m4, 2500000); // TODO: change to insert_ai 
+		
 		// etc: critical change here from .outputFull to .treeSeqOutput
 		sim.treeSeqOutput("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/tmp/" + simnum + ".txt");
-		target = sample(p1.genomes, 1);
-		target.addNewDrawnMutation(m4, 2500000); //random mutation in the middle of the segment 
 	}
 }
 
 10010: late() {
-	if(m4s != 0.0){
+	if(m4s != 0.0){  // We check in on our adaptive variant.
 		mut = sim.mutationsOfType(m4);
 		if (size(mut) == 1) {
 			if (sim.mutationFrequencies(NULL, mut) > 0.1) {
-				sim.deregisterScriptBlock(self);
+				// stop checking in on existence of AI variant if it's at >10% frequency
+				sim.deregisterScriptBlock(self); 
 			}
 		}
 		else {
 			sim.readFromPopulationFile("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/tmp/" + simnum + ".txt");
 			setSeed(getSeed() + 1);
 			target = sample(p1.genomes, 1);
-			target.addNewDrawnMutation(m4, 2500000);
+			target.addNewDrawnMutation(m4, 2500000 );  // TODO: change to insert_ai
 		}
 	}
 }
@@ -124,7 +123,7 @@ initialize() {
 	p2.outputMSSample(100);//, filePath="/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/ms/" + simnum + ".ms"); //african 
 	p3.outputMSSample(100);//, filePath="/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/ms/" + simnum + ".ms"); //non-african 
 	sim.treeSeqOutput("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/trees/sgcb_m0_sexA.trees");
-	if (m4s != 0.0){
+	if (m4s != 0.0){  // Calculate frequency of AI variant in recipient population
 		p4g = p3.genomes;
 		adapt = sim.mutationsOfType(m4);
 		hasAdapt = p4g.containsMutations(adapt);
