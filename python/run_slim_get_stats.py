@@ -67,27 +67,121 @@ num_reps = int(args.numrep_id)
 #sample command: python3 run_slim_get_stats.py -g 1 -h 0 -m 1 -p 4 -d 0 -n 10 -s 1 -r 200
 
 
-def calc_p1ancestry (treepath, admpop, popsize,t_sinceadm,model):
+def calc_p1ancestry (treepath, source_popn, t_sinceadm, model):
     ts = pyslim.load(treepath)
-    any_ancestry = ancestry_p_varies(ts,admpop,popsize,t_sinceadm,model)
+    any_ancestry = ancestry_p_varies(ts, source_popn, t_sinceadm, model)
     meanp1 = sum(any_ancestry)/len(any_ancestry)
+    # This doesn't make much sense to me.  len(any_ancestry) equals ts.num_trees
+    # So this is a per tree average.
     return meanp1
 
-def ancestry_p_varies(ts,pop,nsize,duration,model): #pop=source pop
-    nhaps=nsize*2  # TODO: etc: I changed var name
-    mixtime=duration
-    source_haps = [x.id for x in ts.nodes() if ((x.population == int(pop)) and (x.time == mixtime))] #source pop # TODO: etc: I changed var name
-    if model ==1:
-        today = [x.id for x in ts.nodes() if ((x.population == 4) and (x.time == 0))] #assuming p4 is recipient
-    elif model ==0:
-        today = [x.id for x in ts.nodes() if ((x.population == 3) and (x.time == 0))]
+def ancestry_p_varies(ts, source_popn, time_since_adm, model): #pop=source pop
+    # TODO: surely source_popn and time_since_adm could all be informed by model
+    if model == 1:
+        recip_popn = 4
+    elif model == 0:
+        recip_popn = 3
 
-    tree_p = [sum([t.num_tracked_samples(u) for u in source_haps])/nhaps
-               for t in ts.trees(tracked_samples=today, sample_counts=True)]
-    # TODO: etc: in my small sim at least this is all zero all the time
-    # I need to dig in to understand.. but also maybe just implement 17.4?
+    time_just_before_adm = time_since_adm + 1  # in "generations ago"
+    time_just_after_adm = time_since_adm       # during the adm generation, SLiM remembers individuals after the admixture event happens
+
+    # collect node ids for the relevant samples
+    source_samps_just_before = [ts.node(n).id for n in ts.samples(population=source_popn)
+                                if (ts.node(n).time == time_just_before_adm)]
+    # TODO: [perf] consider not looping through same ts.samples() three times
+    recip_samps_just_before = [ts.node(n).id for n in ts.samples(population=recip_popn)
+                               if (ts.node(n).time == time_just_before_adm)]
+    recip_samps_just_after = [ts.node(n).id for n in ts.samples(population=recip_popn)
+                              if (ts.node(n).time == time_just_after_adm)]
+    recip_samps_today = [ts.node(n).id for n in ts.samples(population=recip_popn)
+                         if (ts.node(n).time == 0)]
+    # Find the source samples that introgressed into recip by looking at the
+    # parents of the recipient population right after admixture.
+        #  this is a very slow way to find just a few remaining parents (vs. just looking at first tree as below)
+        # p3_first_parents = [ts.first().parent(i) for i in recip_samps_just_after]
+    recip_parents_whole_chr = [[t.parent(i) for i in recip_samps_just_after] for t in ts.trees(sample_lists=True)]
+    recip_parents = np.unique(recip_parents_whole_chr)
+    # all of the recip parents should be samples, not untracked nodes
+    assert np.all([ts.node(p).is_sample() for p in recip_parents])
+    recip_parents_from_source = [p for p in recip_parents if (p in source_samps_just_before)]
+    recip_parents_from_recip = [p for p in recip_parents if (p in recip_samps_just_before)]
+    # all the parents must come from either p1 or p3
+    assert np.all(recip_parents_from_source + recip_parents_from_recip == recip_parents)
+
+    tree_p = [sum([t.num_tracked_samples(u) for u in recip_parents_from_source]) / len(recip_samps_today)
+              for t in ts.trees(tracked_samples=recip_samps_today, sample_lists=True)]
+    # TODO: check on ability to make u a list.  suggested in docs
+
+    # etc: in my small sim at least this is all zero all the time
+    # What is this trying to do?
+    # # my original guess:
+    # Return the fraction of all the "living"
+    # (i.e. alive at end of simulation) recipient haplotypes that trace their
+    # ancestry to the introgressing population.
+    # This should be 10% in a "null" model, as the introgression event makes
+    # the recipient population 90% recipient, 10% donor (in model 0, 90% pop3, 10% pop1).
+    # # what I think now is largely the same
+        # tree_p has length of ts.num_trees
+        # for each tree (chr interval), give fract [as above].
+        # later in ancestry_position_writeout we can see where there is more/less
     return tree_p
 
+
+def ancestry_position_writeout(treepath, ancestry_filename, source_popn, t_sinceadm, model):
+    ts = pyslim.load(treepath)
+    starts=[]
+    ends=[]
+
+    for x in ts.trees():
+        starts.append(x.interval[0])
+        ends.append(x.interval[1])
+
+    outfile = open(ancestry_filename, 'w')
+    outfile.write('start,end,ancestry\n')
+
+    p1ancestry = ancestry_p_varies(ts, source_popn, t_sinceadm, model)
+
+    for start, end, anc in zip(starts, ends, p1ancestry):
+        outfile.write('{0},{1},{2}\n'.format(start, end, anc))
+
+    outfile.close()
+
+# No earthly idea why this is implemented like this.
+def calc_ancestry_window (ancestry_file,len_genome):
+    infile = open(ancestry_file,'r')
+    end_pos = []
+    ancestry = []
+    line_counter=0
+    for line_counter, line in enumerate(infile):
+        fields = line.split(',')
+        if fields[0] != "start":
+            end_pos.append(float(fields[1]))
+            ancestry.append(float(fields[2]))
+    infile.close()
+    allpos_bin = np.linspace(0,len_genome,int(len_genome/50000)) #windows of every 50kb
+
+    endpos_digitized = np.digitize(end_pos, allpos_bin)
+    end_pos = np.array(end_pos)
+    ancestry = np.array(ancestry)
+
+    anc_window = []
+    anc_pos = []
+    for w in range(1,100):
+        these_pos = end_pos[endpos_digitized==w]
+        these_anc = ancestry[endpos_digitized==w]
+
+        if(len(these_pos))>0:
+            anc_window.append(np.mean(these_anc))
+            anc_pos.append(these_pos)
+        else:
+            anc_window.append(float('nan'))
+            anc_pos.append(these_pos)
+
+    return anc_window
+
+
+# NEVER CALLED
+# just copied from SLiM manual 17.5
 def ancestry_local (treepath):
     starts, ends, subpops = [], [], []
     ts = pyslim.load(treepath)
@@ -100,38 +194,17 @@ def ancestry_local (treepath):
         starts.append(tree.interval[0])
         ends.append(tree.interval[1])
         subpops.append(subpop_sum / float(subpop_weights))
-
     x = [x for pair in zip(starts, ends) for x in pair]
     y = [x for x in subpops for _ in (0, 1)]
     matplotlib.pyplot.plot(x, y)
     matplotlib.pyplot.show()
     return x,y #x=genome positions; y = ancestry
-
-def ancestry_position_writeout(treepath, ancestry_filename, n,admpop,popsize,t_sinceadm,region_name):
-    ts = pyslim.load(treepath)
-    starts=[]
-    ends=[]
-
-    for x in ts.trees():
-        starts.append(x.interval[0])
-        ends.append(x.interval[1])
-
-    outfile = open(ancestry_filename, 'w')
-    outfile.write('start,end,ancestry\n')
-
-    p1ancestry = ancestry_p_varies(ts,admpop,popsize,t_sinceadm, model)  #TODO: etc I did this
-
-    for start, end, anc in zip(starts, ends, p1ancestry):
-        outfile.write('{0},{1},{2}\n'.format(start, end, anc))
-
-    outfile.close()
-
+# NEVER CALLED
 def write_ancestry (DIR_tree, output_anc_file):
     tree_all = glob.glob(DIR_tree+'*.trees')
     with open(output_anc_file, 'w') as outfile:
         for file in tree_all:
             x,y = ancestry_local (file)
-
             for item in x:
                 outfile.write("%s\t" % item)
             outfile.write("\n")
@@ -212,15 +285,7 @@ def find_ai_site (segfile): #find an exon in the mid-range of the segment to ins
     return window_start,window_end #return exon start and end position
 
 
-def insert_anc_alleles (allpos,pos,hap):
-    for site in allpos:
-        if site not in pos:
-            insertidx = np.searchsorted(pos,site)
-            pos = np.insert(pos,insertidx,site)
-            hap = np.insert(hap, insertidx, 0, axis=1)
-    return pos, hap
-
-def etc_insert_anc_alleles(allpos, pos, haps):
+def insert_anc_alleles(allpos, pos, haps):
     new_haps = np.zeros((haps.shape[0], allpos.size))
     insertidc = np.isin(allpos, pos)
     new_haps[:, insertidc] = haps
@@ -240,6 +305,10 @@ def vSumFunc(other_hap, currentArchi,p1_hapw):
     div = np.logical_xor(current_hap_extended == 1, other_hap == 1)
     return np.add.reduce(div, 1)
 
+#TODO: etc:
+    # https://tskit.readthedocs.io/en/latest/python-api.html#tskit.TreeSequence.haplotypes !!!!
+    # https://tskit.readthedocs.io/en/latest/python-api.html#tskit.TreeSequence.variants
+
 def calc_stats (file_path,len_genome,adm_gen,end_gen):
     pos_den, hapMat_den,pos_afr, hapMat_afr,pos_nonafr, hapMat_nonafr,pos_preadm, hapMat_preadm,freqp4_before,freqp4_after = load_data_slim(file_path,len_genome,adm_gen,end_gen)
 
@@ -252,19 +321,13 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
 
     all_pos = np.unique(np.concatenate((p1_pos,p2_pos,p3_pos)))
 
-#TODO: etc: FYI these are slow
-# this is insane afaict
-# pn_pos is just the same as all_pos
-# pn_hap can be calculated in a far faster manner I think.
-    p1_pos,p1_hap = etc_insert_anc_alleles(all_pos,p1_pos,p1_hap)
-    p2_pos,p2_hap = etc_insert_anc_alleles(all_pos,p2_pos,p2_hap)
-    p3_pos,p3_hap = etc_insert_anc_alleles(all_pos,p3_pos,p3_hap)
-
+    p1_pos,p1_hap = insert_anc_alleles(all_pos,p1_pos,p1_hap)
+    p2_pos,p2_hap = insert_anc_alleles(all_pos,p2_pos,p2_hap)
+    p3_pos,p3_hap = insert_anc_alleles(all_pos,p3_pos,p3_hap)
 
     allpos_bin = np.linspace(0,len_genome,int(len_genome/50000)) #windows of every 50kb
 
     allpos_digitized = np.digitize(all_pos, allpos_bin)
-
 
     Dstat_list = []
     fD_list = []
@@ -531,38 +594,6 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
     oldfile.close()
 
 
-def calc_ancestry_window (ancestry_file,len_genome):
-    infile = open(ancestry_file,'r')
-    end_pos = []
-    ancestry = []
-    line_counter=0
-    for line_counter, line in enumerate(infile):
-        fields = line.split(',')
-        if fields[0] != "start":
-            end_pos.append(float(fields[1]))
-            ancestry.append(float(fields[2]))
-    infile.close()
-    allpos_bin = np.linspace(0,len_genome,int(len_genome/50000)) #windows of every 50kb
-
-    endpos_digitized = np.digitize(end_pos, allpos_bin)
-    end_pos = np.array(end_pos)
-    ancestry = np.array(ancestry)
-
-    anc_window = []
-    anc_pos = []
-    for w in range(1,100):
-        these_pos = end_pos[endpos_digitized==w]
-        these_anc = ancestry[endpos_digitized==w]
-
-        if(len(these_pos))>0:
-            anc_window.append(np.mean(these_anc))
-            anc_pos.append(these_pos)
-        else:
-            anc_window.append(float('nan'))
-            anc_pos.append(these_pos)
-
-    return anc_window
-
 
 def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex):
 
@@ -620,16 +651,15 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
     # Run the SLiM simulation!
     os.system('slim %s > %s' %(new_par, slim_output))
 
-    # # Load ts, write ancestry file, read ancestry file
-    # # TODO: this does not work.
-    # meanp1 = str('[etc meanp1]')
-    # anc_window = str('[etc anc_window]')  # fyi this breaks qput so I messed with it there.  fix this asap
+    # Load ts, write ancestry file, read ancestry file
+    # meanp1 works to my satisfaction!  However, the rest is crazy afaict
+    # TODO: figure out / improve the windows and the file writing/reading
     if model==1:
-        meanp1 = calc_p1ancestry(trees_output_filename, 2,popsize,t_end,model)
-        ancestry_position_writeout(trees_output_filename, ancestry_filename, n,2,popsize,t_end,region_name, sex) #write out ancestry info
+        meanp1 = calc_p1ancestry(trees_output_filename, 2, t_end, model)
+        ancestry_position_writeout(trees_output_filename, ancestry_filename, 2, t_end, model) #write out ancestry info
     elif model==0:
-        meanp1 = calc_p1ancestry(trees_output_filename,1,popsize,t_end,model)   #TODO: etc.  here is issue with 'n'.  just debugging?
-        ancestry_position_writeout(trees_output_filename, ancestry_filename, n,1,popsize,t_end,region_name)
+        meanp1 = calc_p1ancestry(trees_output_filename, 1, t_end, model)
+        ancestry_position_writeout(trees_output_filename, ancestry_filename, 1, t_end, model)
     anc_window = calc_ancestry_window(ancestry_filename, segsize) #get mean ancestry per 50kb window
 
     # Calculate other statistics via loading the std-output from SLiM sim
