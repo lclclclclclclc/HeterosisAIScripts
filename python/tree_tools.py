@@ -9,12 +9,8 @@ Created on Fri Jun 26 10:51:27 2020
 import pyslim
 import msprime
 
-import numpy as np
-import matplotlib.pyplot as plt
 
-
-
-def throw_neutral_muts_after_SLiM(tree_file, region_info_file, neu_or_neg=0,
+def throw_neutral_muts(tree_file, region_info_file, neu_or_neg=0,
                                   n_scale=10, initial_Ne=10000, verbose=False):
     """
     Recapitates .trees output from SLiM simulation and overlays neutral mutations.
@@ -40,8 +36,11 @@ def throw_neutral_muts_after_SLiM(tree_file, region_info_file, neu_or_neg=0,
     Output
     ------
     Writes out .trees file, recapitated, with neutral mutations overlayed.
-    Currently writes to (tree_file + "_with_neutrals" + ".trees").
+    Currently OVERWRITES the original .trees file
 
+    Returns
+    ------
+    ts : treeSeq
 
     """
     ## Set recombination map
@@ -98,11 +97,19 @@ def throw_neutral_muts_after_SLiM(tree_file, region_info_file, neu_or_neg=0,
         mut_rate *= 1 / (1 + 2.31)  # will under-mutate non-exons
 
     ts = pyslim.SlimTreeSequence(msprime.mutate(recap_ts, rate=mut_rate, keep=True))
-    # TODO: clean up output filename
-    ts.dump(tree_file + "_with_neutrals" + ".trees")
+    # TODO: Consider not overwritting original file
+    # default is still to overwrite...
+    out_name = tree_file
+    # ... unless SLiM ts file has extension .orig
+    if tree_file[-5:] == '.orig':
+        out_name = tree_file[:-5]
+    ts.dump(out_name)
 
     ## Messing around
     if verbose:
+        import matplotlib.pyplot as plt
+        import numpy as np
+
         # Mess around with original ts
         print(f"There are {slim_ts.num_individuals} individuals in the SLiM tree.")
         founders=slim_ts.first_generation_individuals()
@@ -129,4 +136,4 @@ def throw_neutral_muts_after_SLiM(tree_file, region_info_file, neu_or_neg=0,
         print("As for throwing mutations...")
         print(f"before there were {slim_ts.num_mutations}; after, {ts.num_mutations}. ")
 
-    return
+    return ts

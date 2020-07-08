@@ -23,9 +23,11 @@ adaptive introgression summary statistics in non-overlapping 50kb windows
 @author: xinjunzhang
 """
 
-import pyslim, os, random, itertools,argparse,glob,matplotlib.pyplot
+import pyslim, os, random, argparse
 import numpy as np
 from multiprocessing import Manager, Pool
+
+import tree_tools as tt  # etc
 
 
 parser = argparse.ArgumentParser(description="A script for running slim and computing summary statistics in 50kb windows across a given chromosome")
@@ -75,7 +77,7 @@ def calc_p1ancestry (treepath, source_popn, t_sinceadm, model):
     # So this is a per tree average.
     return meanp1
 
-def ancestry_p_varies(ts, source_popn, time_since_adm, model): #pop=source pop
+def ancestry_p_varies(ts, source_popn, time_since_adm, model):
     # TODO: surely source_popn and time_since_adm could all be informed by model
     if model == 1:
         recip_popn = 4
@@ -112,7 +114,6 @@ def ancestry_p_varies(ts, source_popn, time_since_adm, model): #pop=source pop
               for t in ts.trees(tracked_samples=recip_samps_today, sample_lists=True)]
     # TODO: check on ability to make u a list.  suggested in docs
 
-    # etc: in my small sim at least this is all zero all the time
     # What is this trying to do?
     # # my original guess:
     # Return the fraction of all the "living"
@@ -139,7 +140,10 @@ def ancestry_position_writeout(treepath, ancestry_filename, source_popn, t_since
     outfile = open(ancestry_filename, 'w')
     outfile.write('start,end,ancestry\n')
 
-    p1ancestry = ancestry_p_varies(ts, source_popn, t_sinceadm, model)
+    # etc: I zero'd this b/c it was the second call to anc_p_var which takes a while
+    # TODO: make only one call to anc_p_var in whole code
+    # p1ancestry = ancestry_p_varies(ts, source_popn, t_sinceadm, model)
+    p1ancestry = np.zeros(len(starts))
 
     for start, end, anc in zip(starts, ends, p1ancestry):
         outfile.write('{0},{1},{2}\n'.format(start, end, anc))
@@ -147,6 +151,7 @@ def ancestry_position_writeout(treepath, ancestry_filename, source_popn, t_since
     outfile.close()
 
 # No earthly idea why this is implemented like this.
+# TODO: so much
 def calc_ancestry_window (ancestry_file,len_genome):
     infile = open(ancestry_file,'r')
     end_pos = []
@@ -180,37 +185,39 @@ def calc_ancestry_window (ancestry_file,len_genome):
     return anc_window
 
 
-# NEVER CALLED
-# just copied from SLiM manual 17.5
-def ancestry_local (treepath):
-    starts, ends, subpops = [], [], []
-    ts = pyslim.load(treepath)
-    for tree in ts.trees(sample_counts=True):
-        subpop_sum, subpop_weights = 0, 0
-        for root in tree.roots:
-            leaves_count = tree.num_samples(root) - 1
-            subpop_sum += tree.population(root) * leaves_count
-            subpop_weights += leaves_count
-        starts.append(tree.interval[0])
-        ends.append(tree.interval[1])
-        subpops.append(subpop_sum / float(subpop_weights))
-    x = [x for pair in zip(starts, ends) for x in pair]
-    y = [x for x in subpops for _ in (0, 1)]
-    matplotlib.pyplot.plot(x, y)
-    matplotlib.pyplot.show()
-    return x,y #x=genome positions; y = ancestry
-# NEVER CALLED
-def write_ancestry (DIR_tree, output_anc_file):
-    tree_all = glob.glob(DIR_tree+'*.trees')
-    with open(output_anc_file, 'w') as outfile:
-        for file in tree_all:
-            x,y = ancestry_local (file)
-            for item in x:
-                outfile.write("%s\t" % item)
-            outfile.write("\n")
-            for item in y:
-                outfile.write("%s\t" % item)
-            outfile.write("\n")
+# # NEVER CALLED
+# import glob
+# import matplotlib.pyplot
+# # just copied from SLiM manual 17.5
+# def ancestry_local (treepath):
+#     starts, ends, subpops = [], [], []
+#     ts = pyslim.load(treepath)
+#     for tree in ts.trees(sample_counts=True):
+#         subpop_sum, subpop_weights = 0, 0
+#         for root in tree.roots:
+#             leaves_count = tree.num_samples(root) - 1
+#             subpop_sum += tree.population(root) * leaves_count
+#             subpop_weights += leaves_count
+#         starts.append(tree.interval[0])
+#         ends.append(tree.interval[1])
+#         subpops.append(subpop_sum / float(subpop_weights))
+#     x = [x for pair in zip(starts, ends) for x in pair]
+#     y = [x for x in subpops for _ in (0, 1)]
+#     matplotlib.pyplot.plot(x, y)
+#     matplotlib.pyplot.show()
+#     return x,y #x=genome positions; y = ancestry
+# # NEVER CALLED
+# def write_ancestry (DIR_tree, output_anc_file):
+#     tree_all = glob.glob(DIR_tree+'*.trees')
+#     with open(output_anc_file, 'w') as outfile:
+#         for file in tree_all:
+#             x,y = ancestry_local (file)
+#             for item in x:
+#                 outfile.write("%s\t" % item)
+#             outfile.write("\n")
+#             for item in y:
+#                 outfile.write("%s\t" % item)
+#             outfile.write("\n")
 
 
 def load_data_slim(file_path,len_genome,adm_gen,end_gen): # load slim's output
@@ -218,7 +225,10 @@ def load_data_slim(file_path,len_genome,adm_gen,end_gen): # load slim's output
     pos_den, hapMat_den,freqp4_before,freqp4_after = get_pos_hap(file_path,'p1',len_genome,end_gen)
     pos_afr, hapMat_afr,freqp4_before,freqp4_after = get_pos_hap(file_path,'p2',len_genome,end_gen)
     pos_nonafr, hapMat_nonafr,freqp4_before,freqp4_after = get_pos_hap(file_path,'p3',len_genome,end_gen)
-    pos_preadm, hapMat_preadm,freqp4_before,freqp4_after = get_pos_hap(file_path,'p3',len_genome,adm_gen)
+    # pos_preadm, hapMat_preadm,freqp4_before,freqp4_after = get_pos_hap(file_path,'p3',len_genome,adm_gen)
+# TODO: either remove or utilize preadm info.
+    pos_preadm = 'pointless'
+    hapMat_preadm = 'pointless2'
 
     # TODO: etc: just really wrong....?
     # pos_den, hapMat_den,freqp4_before,freqp4_after = get_pos_hap(file_path,'p2',len_genome,end_gen)
@@ -244,8 +254,8 @@ def get_pos_hap(file_path,pop_id,len_genome,gen_time): #get pos and hapMat for a
             gen = fields[1]
             if out_type=='SM' and pop==pop_id and int(gen) == gen_time: #ms lines
                 num_indiv = int(fields[4])
-                infile.readline() #skip //
-                infile.readline() #skip segsites
+                infile.readline() # skip //
+                infile.readline() # skip segsites
                 pos = (np.array(infile.readline().split()[1:]).astype(float) * len_genome).astype(int)
                 mult_mut_pos = find_mult_mut_pos(pos)+1
                 pos = np.delete(pos,mult_mut_pos)
@@ -597,7 +607,7 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
     # set filenames
     region_name = region_all[r]
     region_info_filename = dir_stem + 'regions/sim_seq_info_' + str(region_name) + '.txt'
-    trees_output_filename = dir_stem + 'output/trees/'+str(region_name)+'_m0_sex'+str(sex)+'.trees'
+    trees_filename = dir_stem + 'output/trees/'+str(region_name)+'_m'+str(model)+'_sex'+str(sex)+'.trees'
     new_par = DIR_par +"par_"+region_name+str(dominance)+str(model)+ str(sex)+str(n)+".txt"
     ancestry_filename = DIR_anc + region_name+str(dominance)+ "_"+str(model)+ "_"+str(growth)+ "_"+str(m4s)+ "_"+str(hs) + "_"+str(n) + '.ancestry'
 
@@ -639,7 +649,7 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
         popsize = 1000 / nscale  # size of p3 (as split off from p2 in mod0)
 
     update_par_file(temp_par, new_par, model, growth, dominance,
-                    nscale, m4s, hs, insert_ai, sex, trees_output_filename,
+                    nscale, m4s, hs, insert_ai, sex, trees_filename+'.orig',
                     region_info_filename)
 
     # this is the slim output file in MS format (0x and 1s for haplotypes)
@@ -653,19 +663,19 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
     os.system('slim %s > %s' %(new_par, slim_output))
 
     # Overlay neutral mutations onto TreeSequence
-    # TODO: do so
-    # Idea is to put my new tree functions into separate file.
-    # TODO: make etc_throw_neutral_muts.py into this file and import it.
+    # TODO: variable-ize initial_Ne (size of p1 at beginning of sim)
+    tt.throw_neutral_muts(trees_filename+'.orig', region_info_filename,
+                           neu_or_neg=dominance, n_scale=nscale)
 
     # Load ts, write ancestry file, read ancestry file
         # meanp1 works to my satisfaction!  However, the rest is crazy afaict
         # TODO: figure out / improve the windows and the file writing/reading
     if model==1:
-        meanp1 = calc_p1ancestry(trees_output_filename, 2, t_end, model)
-        ancestry_position_writeout(trees_output_filename, ancestry_filename, 2, t_end, model) #write out ancestry info
+        meanp1 = calc_p1ancestry(trees_filename, 2, t_end, model)
+        ancestry_position_writeout(trees_filename, ancestry_filename, 2, t_end, model) #write out ancestry info
     elif model==0:
-        meanp1 = calc_p1ancestry(trees_output_filename, 1, t_end, model)
-        ancestry_position_writeout(trees_output_filename, ancestry_filename, 1, t_end, model)
+        meanp1 = calc_p1ancestry(trees_filename, 1, t_end, model)
+        ancestry_position_writeout(trees_filename, ancestry_filename, 1, t_end, model)
     anc_window = calc_ancestry_window(ancestry_filename, segsize) #get mean ancestry per 50kb window
 
     # Calculate other statistics via loading the std-output from SLiM sim
