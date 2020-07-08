@@ -305,9 +305,6 @@ def vSumFunc(other_hap, currentArchi,p1_hapw):
     div = np.logical_xor(current_hap_extended == 1, other_hap == 1)
     return np.add.reduce(div, 1)
 
-#TODO: etc:
-    # https://tskit.readthedocs.io/en/latest/python-api.html#tskit.TreeSequence.haplotypes !!!!
-    # https://tskit.readthedocs.io/en/latest/python-api.html#tskit.TreeSequence.variants
 
 def calc_stats (file_path,len_genome,adm_gen,end_gen):
     pos_den, hapMat_den,pos_afr, hapMat_afr,pos_nonafr, hapMat_nonafr,pos_preadm, hapMat_preadm,freqp4_before,freqp4_after = load_data_slim(file_path,len_genome,adm_gen,end_gen)
@@ -645,15 +642,24 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
                     nscale, m4s, hs, insert_ai, sex, trees_output_filename,
                     region_info_filename)
 
-    # etc: this is the slim output file where nothing has the line #OUT:
+    # this is the slim output file in MS format (0x and 1s for haplotypes)
+    # TODO: Move away from writing/reading these.
+    # See below to extract from ts after throwing neutrals?
+    # https://tskit.readthedocs.io/en/latest/python-api.html#tskit.TreeSequence.haplotypes !!!!
+    # https://tskit.readthedocs.io/en/latest/python-api.html#tskit.TreeSequence.variants
     slim_output = DIR_out +'OUT_'+region_name+str(sex)+str(m4s)+ str(n)+".txt"
 
     # Run the SLiM simulation!
     os.system('slim %s > %s' %(new_par, slim_output))
 
+    # Overlay neutral mutations onto TreeSequence
+    # TODO: do so
+    # Idea is to put my new tree functions into separate file.
+    # TODO: make etc_throw_neutral_muts.py into this file and import it.
+
     # Load ts, write ancestry file, read ancestry file
-    # meanp1 works to my satisfaction!  However, the rest is crazy afaict
-    # TODO: figure out / improve the windows and the file writing/reading
+        # meanp1 works to my satisfaction!  However, the rest is crazy afaict
+        # TODO: figure out / improve the windows and the file writing/reading
     if model==1:
         meanp1 = calc_p1ancestry(trees_output_filename, 2, t_end, model)
         ancestry_position_writeout(trees_output_filename, ancestry_filename, 2, t_end, model) #write out ancestry info
@@ -664,7 +670,6 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
 
     # Calculate other statistics via loading the std-output from SLiM sim
     pos_start,pos_end,freqp4_before,freqp4_after,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list = calc_stats(slim_output,segsize,adm_gen,end_gen)
-    print(f"Max heterozygosity is {max(Het_list)}.")
 
     q.put([n,insert_ai,growth,meanp1,pos_start,pos_end,freqp4_before,freqp4_after,anc_window, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
     #other parameter info are stored in the output file name
@@ -748,6 +753,12 @@ if __name__=='__main__':
     q.put('kill')
     pool.close()
     pool.join()
+
+    # peek at first line of stats file to check in on things
+    with open(windowfile_name, 'r') as f:
+        print("First line of stats file for this run is below.")
+        print(f.readline())
+
 
 
     print("END OF SIMULATION")

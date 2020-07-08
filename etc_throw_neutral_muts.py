@@ -7,7 +7,6 @@ Created on Fri Jun 26 10:51:27 2020
 """
 
 import pyslim
-import tskit
 import msprime
 
 import numpy as np
@@ -102,9 +101,6 @@ recomb_map = make_region_recombination_map(region_file)
 
 #%% Recapitate
 
-# I think I need to be doing msprime.simulation(from_ts), not msp.mutate...
-# https://msprime.readthedocs.io/en/latest/api.html?highlight=recombination#msprime.simulate
-# BUT  I now think I should be using the pyslim ts.recapitate
 # https://pyslim.readthedocs.io/en/latest/python_api.html#pyslim.SlimTreeSequence.recapitate
 # TODO: sort out reading in number of individuals.. necessary? why is default Ne=1?
 n=10000
@@ -113,32 +109,32 @@ n_p1 = n/n_scale
 recap_ts = neg_ts.recapitate(recombination_map=recomb_map, Ne=1000)
 
 # TODO: decide about simplifying here?  Essentially sampling here.
+# How does the simplifying default to SLiM tree writing figure in?
 # I think this depends on how statistics are calculated
 
+
 #%% Throw mutations and output
-# TODO: sort out mutation rate variation / ratios
-# mut_rate = 10e-10
+# TODO: Wait for mutationMaps to magically appear?
+# Need mutation rate variation to ensure equal density of mutations along chromosome
+# Mutation rate maps are coming to msprime... I think they're already implemented but not doc'd.
+# Should I use a development version of msprime?  Mine does not have the .MutationMap class.
+# see: https://github.com/tskit-dev/msprime/pull/920 , also 902, 711
+#       https://github.com/tskit-dev/msprime/blob/master/msprime/mutations.py line 700ish
 
 # mutation rate scaling notes from SLiM sim code:
 #   // exon uses a mixture of syn and nonsyn at a 1:2.31 ratio (Huber et al.)
 # 	// to achieve an overall mutation rate of 1.5e-8, need 2.31/(1+2.31) fraction of all muts to be nonsyn
 # 	// i.e. ~0.6979 fraction of all muts should be the deleterious ones simulated here as "m1".
 # 	// the remaining ~0.3021 fraction of all mut.s should be thrown later as neutrals.
-
 # HOWEVER, this logic applies if we were only simulating exon regions.
-# Would need mutation rate variation to ensure equal density of mutations along chromosome
-# Mutation rate maps are coming to msprime... I think they're already implemented but not doc'd.
-# Should I use a development version of msprime?  Mine does not have the .MutationMap class.
-# see: https://github.com/tskit-dev/msprime/pull/920 , also 902, 711
-#       https://github.com/tskit-dev/msprime/blob/master/msprime/mutations.py line 700ish
 
-# mut_rate = 1.5e-8 * n_scale  # will over-mutate exonic regions
+
+# mut_rate = 1.5e-8 * n_scale  # fine for neutral model;  will over-mutate exonic regions in neg
 mut_rate = 1.5e-8 * (1/(1+2.31)) * n_scale  # will under-mutate rest of genome
 
 ts = pyslim.SlimTreeSequence(msprime.mutate(recap_ts, rate=mut_rate, keep=True))
 ts.dump(DIR_tree + tree_fn + "_with_neutrals" + ".trees")
 
-# TODO: what format for existing code?  ms I think
 
 #%% Mess around with full recap'd, mutated ts
 
