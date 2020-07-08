@@ -101,6 +101,7 @@ def ancestry_p_varies(ts, source_popn, time_since_adm, model):
     # parents of the recipient population right after admixture.
         #  this is a very slow way to find just a few remaining parents (vs. just looking at first tree as below)
         # p3_first_parents = [ts.first().parent(i) for i in recip_samps_just_after]
+
     recip_parents_whole_chr = [[t.parent(i) for i in recip_samps_just_after] for t in ts.trees(sample_lists=True)]
     recip_parents = np.unique(recip_parents_whole_chr)
     # all of the recip parents should be samples, not untracked nodes
@@ -316,24 +317,13 @@ def vSumFunc(other_hap, currentArchi,p1_hapw):
     return np.add.reduce(div, 1)
 
 
-def calc_stats (file_path,len_genome,adm_gen,end_gen):
-    pos_den, hapMat_den,pos_afr, hapMat_afr,pos_nonafr, hapMat_nonafr,pos_preadm, hapMat_preadm,freqp4_before,freqp4_after = load_data_slim(file_path,len_genome,adm_gen,end_gen)
+def calc_stats (trees_filename):
 
-    p1_pos = pos_den
-    p2_pos = pos_afr
-    p3_pos = pos_nonafr
-    p1_hap = hapMat_den
-    p2_hap = hapMat_afr
-    p3_hap = hapMat_nonafr
+    ts = pyslim.load(trees_filename)
+    (p1_hap, p2_hap, p3_hap), all_pos = tt.sample_population_haplotypes(ts, check_loc=insert_ai)
 
-    all_pos = np.unique(np.concatenate((p1_pos,p2_pos,p3_pos)))
-
-    p1_pos,p1_hap = insert_anc_alleles(all_pos,p1_pos,p1_hap)
-    p2_pos,p2_hap = insert_anc_alleles(all_pos,p2_pos,p2_hap)
-    p3_pos,p3_hap = insert_anc_alleles(all_pos,p3_pos,p3_hap)
-
+    len_genome = ts.sequence_length
     allpos_bin = np.linspace(0,len_genome,int(len_genome/50000)) #windows of every 50kb
-
     allpos_digitized = np.digitize(all_pos, allpos_bin)
 
     Dstat_list = []
@@ -364,7 +354,7 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
             p2_hapw = p2_hap[:,these_pos_idx]
             p3_hapw = p3_hap[:,these_pos_idx]
 
-            p1_freqw = calc_derived_freq (p1_hapw)
+            p1_freqw = calc_derived_freq (p1_hapw)  # why is this called "derived"? It's just a w/in pop'n allele freq
             p2_freqw = calc_derived_freq (p2_hapw)
             p3_freqw = calc_derived_freq (p3_hapw)
 
@@ -401,7 +391,7 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
             Het = np.sum(hetvec) /50000  # etc: again, hardcoded window length
             Het_list.append(Het)
 
-
+            # TODO: Re-implement this
             # divratio = []
             # # for archi in range(p1_hapw.shape[0]): #iterate over 0-99 haps; 100 total)
             # for archi in range(0, 3): # TODO: etc: put this back.  just smaller for testing p1_hapw.shape[0]): #iterate over 0-99 haps; 100 total
@@ -463,7 +453,7 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
             U_1_80_100_list.append(float('nan'))
 
 
-    return pos_start, pos_end, freqp4_before, freqp4_after, Dstat_list, fD_list, Het_list, divratioavg_list, Q_1_100_q95_list, Q_1_100_q90_list, Q_1_100_max_list, U_1_0_100_list, U_1_20_100_list, U_1_50_100_list, U_1_80_100_list
+    return pos_start, pos_end, Dstat_list, fD_list, Het_list, divratioavg_list, Q_1_100_q95_list, Q_1_100_q90_list, Q_1_100_max_list, U_1_0_100_list, U_1_20_100_list, U_1_50_100_list, U_1_80_100_list
 
 
 def update_par_file(temp_par, new_par, model, growth, dominance,
@@ -669,6 +659,7 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
 
     # Load ts, write ancestry file, read ancestry file
         # meanp1 works to my satisfaction!  However, the rest is crazy afaict
+            # note, the per-tree doesn't make any sense
         # TODO: figure out / improve the windows and the file writing/reading
     if model==1:
         meanp1 = calc_p1ancestry(trees_filename, 2, t_end, model)
@@ -679,9 +670,9 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
     anc_window = calc_ancestry_window(ancestry_filename, segsize) #get mean ancestry per 50kb window
 
     # Calculate other statistics via loading the std-output from SLiM sim
-    pos_start,pos_end,freqp4_before,freqp4_after,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list = calc_stats(slim_output,segsize,adm_gen,end_gen)
+    pos_start,pos_end,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list = calc_stats(trees_filename)
 
-    q.put([n,insert_ai,growth,meanp1,pos_start,pos_end,freqp4_before,freqp4_after,anc_window, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
+    q.put([n,insert_ai,growth,meanp1,pos_start,pos_end,anc_window, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
     #other parameter info are stored in the output file name
 
     # os.system('rm '+slim_output)
@@ -701,9 +692,9 @@ def write_to_file(windowfile_name,q):
             print ('END OF SIMULATIONS')
             break
 
-        [n,insert_ai,growth,meanp1,pos_start,pos_end,freqp4_before,freqp4_after,anc_window,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list] = q_elem
+        [n,insert_ai,growth,meanp1,pos_start,pos_end,anc_window,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list] = q_elem
         for i in range(len(Dstat_list)):
-            windowfile.write("%d\t%d\t%d\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (n,insert_ai,growth,meanp1,pos_start[i],pos_end[i],freqp4_before,freqp4_after,anc_window[i],Dstat_list[i], fD_list[i], Het_list[i], divratioavg_list[i],Q_1_100_q95_list[i],Q_1_100_q90_list[i],Q_1_100_max_list[i],U_1_0_100_list[i],U_1_20_100_list[i],U_1_50_100_list[i],U_1_80_100_list[i]))
+            windowfile.write("%d\t%d\t%d\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (n,insert_ai,growth,meanp1,pos_start[i],pos_end[i],anc_window[i],Dstat_list[i], fD_list[i], Het_list[i], divratioavg_list[i],Q_1_100_q95_list[i],Q_1_100_q90_list[i],Q_1_100_max_list[i],U_1_0_100_list[i],U_1_20_100_list[i],U_1_50_100_list[i],U_1_80_100_list[i]))
 
         windowfile.flush()
 

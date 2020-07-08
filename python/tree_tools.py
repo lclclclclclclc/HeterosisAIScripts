@@ -8,8 +8,9 @@ Created on Fri Jun 26 10:51:27 2020
 
 import pyslim
 import msprime
+import numpy as np
 
-
+#%%
 def throw_neutral_muts(tree_file, region_info_file, neu_or_neg=0,
                                   n_scale=10, initial_Ne=10000, verbose=False):
     """
@@ -137,3 +138,71 @@ def throw_neutral_muts(tree_file, region_info_file, neu_or_neg=0,
         print(f"before there were {slim_ts.num_mutations}; after, {ts.num_mutations}. ")
 
     return ts
+
+#%%
+
+def sample_population_haplotypes(ts, popn_ids=(1,2,3), n_haps=100, check_loc=None):
+    """
+    Using a tree sequence, takes extant samples from three populations
+    and generates both haplotype matrices (n_haps x [number of variants]) for each
+    population and the chromosome position for each variant.
+
+    Parameters
+    ----------
+    ts : TreeSeq
+        Tree sequence from SLiM simulation.
+    popn_ids : tuple or list, optional
+        Three population ids from each of which to sample n_haps haplotypes.
+        The default is (1,2,3).
+    n_haps : int, optional
+        Number of haplotypes to sample from each of the three populations.
+        The default is 100.
+    check_loc : int or float, optional
+        If provided, will throw assertion error if this chromosome coordinate
+        is not found in the variant positions. The default is None.
+
+    Returns
+    -------
+    tuple
+        3-tuple of haplotype matrices for each population, in order of popn_ids.
+    np array
+        Locations of each variant (matrix column) in SLiM chromosome coordinates.
+
+    """
+
+    def sample_extant_haplotypes(population, n_haps):
+        # TODO: later, make sure this is a sample with the correct sex ratio.
+        all_samps = np.asarray([ts.node(n).id for n in ts.samples(population=population)
+                             if (ts.node(n).time == 0)])
+        return np.random.choice(all_samps, size=n_haps, replace=False)
+
+    ## Sample down to n_haps extant nodes per population
+    # TODO: should I be sampling individuals and keeping both their nodes?
+    #       perhaps not if I want to do same for sex chromosomes
+    extant_samples = np.concatenate((sample_extant_haplotypes(popn_ids[0], n_haps),
+                                    sample_extant_haplotypes(popn_ids[1], n_haps),
+                                    sample_extant_haplotypes(popn_ids[2], n_haps)))
+    # reduce ts to only these samples so the matrix isn't too big
+    sts = ts.simplify(samples=extant_samples, reduce_to_site_topology=True)
+        # In the returned tree sequence, the node with ID 0 corresponds to samples[0], node 1 corresponds to samples[1], and so on. Besides the samples, node IDs in the returned tree sequence are then allocated sequentially in time order.
+
+    ## Generate the haplotypes
+    haplotype_matrix = sts.genotype_matrix()
+    # flip to match other code: make rows individual haplotypes, columns -> vars
+    hap_mat = np.transpose(haplotype_matrix)
+
+    ## Split haplotype matrix into population-specific matrices
+    p1_haps = hap_mat[:n_haps, :]
+    p2_haps = hap_mat[n_haps:2*n_haps, :]
+    p3_haps = hap_mat[2*n_haps:, :]
+    # check that we've broken up the array without missing or duplicating any haps
+    assert np.all(np.vstack((p1_haps, p2_haps, p3_haps)) == hap_mat)
+
+    ## Get positions of mutations in chr coordinates
+    # check that hap_mat contains all the sites
+    assert sts.num_sites == np.shape(hap_mat)[1]
+    positions = np.asarray([s.position for s in sts.sites()])
+    if check_loc is not None:  # just check that the AI var is in the positions
+        assert check_loc in positions
+
+    return (p1_haps, p2_haps, p3_haps), positions
