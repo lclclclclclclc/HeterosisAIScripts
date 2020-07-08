@@ -759,6 +759,4 @@ if __name__=='__main__':
         print("First line of stats file for this run is below.")
         print(f.readline())
 
-
-
     print("END OF SIMULATION")
