@@ -68,131 +68,21 @@ num_reps = int(args.numrep_id)
 
 #sample command: python3 run_slim_get_stats.py -g 1 -h 0 -m 1 -p 4 -d 0 -n 10 -s 1 -r 200
 
-
-def calc_p1ancestry (treepath, source_popn, t_sinceadm, model):
-    ts = pyslim.load(treepath)
-    any_ancestry = ancestry_p_varies(ts, source_popn, t_sinceadm, model)
-    meanp1 = sum(any_ancestry)/len(any_ancestry)
-    # This doesn't make much sense to me.  len(any_ancestry) equals ts.num_trees
-    # So this is a per tree average.
-    return meanp1
-
-def calc_ancestry_p_windows(ts, source_popn, time_since_adm, model):
-    # TODO: surely source_popn and time_since_adm could all be informed by model
-    if model == 1:
-        recip_popn = 4
-    elif model == 0:
-        recip_popn = 3
-
-    time_just_before_adm = time_since_adm + 1  # in "generations ago"
-    time_just_after_adm = time_since_adm       # during the adm generation, SLiM remembers individuals after the admixture event happens
-
-    def peri_admixture_sample_lists(ts, just_before, just_after, source_popn, recip_popn):
-        # collect node ids for the relevant samples
-        source_samps_just_before = [ts.node(n).id for n in ts.samples(population=source_popn)
-                                    if (ts.node(n).time == time_just_before_adm)]
-        recip_samps_just_before = [ts.node(n).id for n in ts.samples(population=recip_popn)
-                                   if (ts.node(n).time == time_just_before_adm)]
-        recip_samps_just_after = [ts.node(n).id for n in ts.samples(population=recip_popn)
-                                  if (ts.node(n).time == time_just_after_adm)]
-        recip_samps_today = [ts.node(n).id for n in ts.samples(population=recip_popn)
-                             if (ts.node(n).time == 0)]
-        return source_samps_just_before, recip_samps_just_before, recip_samps_just_after, recip_samps_today
-
-    # Find the source samples that introgressed into recip by looking at the
-    # parents of the recipient population right after admixture.
-        #  this is a very slow way to find just a few remaining parents (vs. just looking at first tree as below)
-        # p3_first_parents = [ts.first().parent(i) for i in recip_samps_just_after]
-    # because it's slow, I'm going to try to simplify and see if that helps
-    s_b, r_b, r_a, r_t = peri_admixture_sample_lists(ts, time_just_before_adm, time_just_after_adm, source_popn, recip_popn)
-    samples_to_keep = np.concatenate((s_b, r_b, r_a, r_t))
-
-    sts = ts.simplify(samples=samples_to_keep)
-    # TODO: what precisely does reduce_to_site_topology do?
-        # It certainly has an effect:  simplified tree goes from 15k trees to 6.7k trees.
-    # After simplifying, now have new node ids for samples.  Need to split them out again.
-        # Could (1) go by length of array chunks
-        # (2) something with map_nodes=True in simplify call
-        # (3) do same listcomps as above
-        # (4) take the whole issue to SLiM and try to flag the intogressors specifically
-    # For now, do option (3) via helper function.
-
-    # these are being overwritten into new node_ids in the simplified ts world
-    # populations are now zero-indexed.  Maybe I could prevent this by doing a pyslim loading?
-    s_b, r_b, r_a, r_t = peri_admixture_sample_lists(sts, time_just_before_adm, time_just_after_adm, source_popn-1, recip_popn-1)
-
-    recip_parents_whole_chr = [[t.parent(i) for i in r_a] for t in sts.trees(sample_lists=True)]
-    recip_parents = np.unique(recip_parents_whole_chr)
-    # all of the recip parents should be samples, not untracked nodes
-    assert np.all([sts.node(p).is_sample() for p in recip_parents])
-    recip_parents_from_source = [p for p in recip_parents if (p in s_b)]
-    recip_parents_from_recip = [p for p in recip_parents if (p in r_b)]
-    # all the parents must come from either p1 or p3
-    assert np.all(recip_parents_from_source + recip_parents_from_recip == recip_parents)
-
-    tree_p = [sum([t.num_tracked_samples(u) for u in recip_parents_from_source]) / len(r_t)
-              for t in sts.trees(tracked_samples=r_t, sample_lists=True)]
-    # TODO: check on ability to make u a list.  suggested in docs
-
-    # What is this trying to do?
-    # # my original guess:
-    # Return the fraction of all the "living"
-    # (i.e. alive at end of simulation) recipient haplotypes that trace their
-    # ancestry to the introgressing population.
-    # This should be 10% in a "null" model, as the introgression event makes
-    # the recipient population 90% recipient, 10% donor (in model 0, 90% pop3, 10% pop1).
-    # # what I think now is largely the same
-        # tree_p has length of ts.num_trees
-        # for each tree (chr interval), give fract [as above].
-        # later in ancestry_position_writeout we can see where there is more/less
-    return tree_p
-
-
-def ancestry_position_writeout(treepath, ancestry_filename, source_popn, t_sinceadm, model):
-    ts = pyslim.load(treepath)
-    starts=[]
-    ends=[]
-
-    for x in ts.trees():
-        starts.append(x.interval[0])
-        ends.append(x.interval[1])
-
-    outfile = open(ancestry_filename, 'w')
-    outfile.write('start,end,ancestry\n')
-
-    # etc: I zero'd this b/c it was the second call to anc_p_var which takes a while
-    # TODO: make only one call to anc_p_var in whole code
-    # p1ancestry = ancestry_p_varies(ts, source_popn, t_sinceadm, model)
-    p1ancestry = np.zeros(len(starts))
-
-    for start, end, anc in zip(starts, ends, p1ancestry):
-        outfile.write('{0},{1},{2}\n'.format(start, end, anc))
-
-    outfile.close()
-
 # No earthly idea why this is implemented like this.
-# TODO: so much
-def calc_ancestry_window (ancestry_file,len_genome):
-    infile = open(ancestry_file,'r')
-    end_pos = []
-    ancestry = []
-    line_counter=0
-    for line_counter, line in enumerate(infile):
-        fields = line.split(',')
-        if fields[0] != "start":
-            end_pos.append(float(fields[1]))
-            ancestry.append(float(fields[2]))
-    infile.close()
-    allpos_bin = np.linspace(0,len_genome,int(len_genome/50000)) #windows of every 50kb
+# TODO: scrap the file i/o but keep the digitization
+def calc_ancestry_window (ancestry_fracs, intervals, len_genome=5000000):
+    # TODO: actually fix the window size hardcoding
+    num_windows = 100
+    allpos_bin = np.linspace(0,len_genome,num_windows) #windows of every 50kb
 
-    endpos_digitized = np.digitize(end_pos, allpos_bin)
-    end_pos = np.array(end_pos)
-    ancestry = np.array(ancestry)
+    end_positions = np.asarray([i[1] for i in intervals])
+    endpos_digitized = np.digitize(end_positions, allpos_bin)
+    ancestry = np.asarray(ancestry_fracs)
 
     anc_window = []
     anc_pos = []
-    for w in range(1,100):
-        these_pos = end_pos[endpos_digitized==w]
+    for w in range(1, num_windows):
+        these_pos = end_positions[endpos_digitized==w]
         these_anc = ancestry[endpos_digitized==w]
 
         if(len(these_pos))>0:
@@ -618,7 +508,6 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
     region_info_filename = dir_stem + 'regions/sim_seq_info_' + str(region_name) + '.txt'
     trees_filename = dir_stem + 'output/trees/'+str(region_name)+'_m'+str(model)+'_sex'+str(sex)+'.trees'
     new_par = DIR_par +"par_"+region_name+str(dominance)+str(model)+ str(sex)+str(n)+".txt"
-    ancestry_filename = DIR_anc + region_name+str(dominance)+ "_"+str(model)+ "_"+str(growth)+ "_"+str(m4s)+ "_"+str(hs) + "_"+str(n) + '.ancestry'
 
     segsize = 5000000  # nice that this is here, but hardcoded everywhere else
 
@@ -640,6 +529,8 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
             popsize = 7300/nscale
         elif growth ==4:
             popsize = 41080/nscale
+        source_popn = 2
+        recip_popn = 4  # etc: not sure
 
     elif model == 0:
         # etc: why were these timepoints not used in writing par files????
@@ -656,6 +547,9 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
         # etc: why were these values not used in writing par files????
         t_end = 10000 / nscale  # etc: this means generations elapsed from admixture to end of simulation (present)
         popsize = 1000 / nscale  # size of p3 (as split off from p2 in mod0)
+        source_popn = 1
+        recip_popn = 3
+        adm_gens_ago = end_gen - adm_gen
 
     update_par_file(temp_par, new_par, model, growth, dominance,
                     nscale, m4s, hs, insert_ai, sex, trees_filename+'.orig',
@@ -673,38 +567,29 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
 
     # Overlay neutral mutations onto TreeSequence
     # TODO: variable-ize initial_Ne (size of p1 at beginning of sim)
-    tt.throw_neutral_muts(trees_filename+'.orig', region_info_filename,
+    ts = tt.throw_neutral_muts(trees_filename+'.orig', region_info_filename,
                            neu_or_neg=dominance, n_scale=nscale)
 
-    # Load ts, write ancestry file, read ancestry file
-        # meanp1 works to my satisfaction!  However, the rest is crazy afaict
-            # note, the per-tree doesn't make any sense
-        # TODO: figure out / improve the windows and the file writing/reading
-    if model==1:
-        meanp1 = calc_p1ancestry(trees_filename, 2, t_end, model)
-        ancestry_position_writeout(trees_filename, ancestry_filename, 2, t_end, model) #write out ancestry info
-    elif model==0:
-        meanp1 = calc_p1ancestry(trees_filename, 1, t_end, model)
-        ancestry_position_writeout(trees_filename, ancestry_filename, 1, t_end, model)
-    anc_window = calc_ancestry_window(ancestry_filename, segsize) #get mean ancestry per 50kb window
+    # Calculate how much source ancestry is present in today's recipient popn
+    source_anc_fracs, intervals = tt.calc_ancestry_frac_over_region(ts, source_popn, recip_popn, adm_gens_ago)
+    mean_source_anc = np.mean(source_anc_fracs)
+    source_anc_by_window = calc_ancestry_window(source_anc_fracs, intervals) #get mean ancestry per 50kb window
 
-    # Calculate other statistics via loading the std-output from SLiM sim
+    # Calculate other statistics from genotype matrices
     pos_start,pos_end,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list = calc_stats(trees_filename)
 
-    q.put([n,insert_ai,growth,meanp1,pos_start,pos_end,anc_window, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
+    q.put([n,insert_ai,growth,mean_source_anc,pos_start,pos_end,source_anc_by_window, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
     #other parameter info are stored in the output file name
 
     # os.system('rm '+slim_output)
     # os.system('rm '+treepath)
     # os.system('rm '+new_par)
-    # os.system('rm '+ancestry_file)
-
 
 
 def write_to_file(windowfile_name,q):
     windowfile = open(windowfile_name,'w')
 
-    while 1:
+    while 1:  # etc: terrifying
         q_elem = q.get()
 
         if q_elem=='kill': # break if end of queue
@@ -741,7 +626,6 @@ if __name__=='__main__':
     dir_stem = "/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/"
 
     DIR_region = dir_stem + "regions/"
-    DIR_anc = dir_stem + "output/ancestry/"
     DIR_out = dir_stem + "output/out/"
     DIR_tree = dir_stem + "output/trees/"
     DIR_par = dir_stem + "slim/"
@@ -757,7 +641,7 @@ if __name__=='__main__':
     insert_ai = int((int(window_end)+int(window_start))/2)
 
     attempt_num = np.random.randint(5000)
-    windowfile_name = dir_stem + "output/stats/20200630/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'-attempt' + str(attempt_num) + '_human_windows.txt'
+    windowfile_name = dir_stem + "output/stats/20200709/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'-attempt' + str(attempt_num) + '_human_windows.txt'
     num_proc = 10
     manager = Manager()
     pool = Pool(processes=num_proc)

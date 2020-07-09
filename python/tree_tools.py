@@ -206,3 +206,98 @@ def sample_population_haplotypes(ts, popn_ids=(1,2,3), n_haps=100, check_loc=Non
         assert check_loc in positions
 
     return (p1_haps, p2_haps, p3_haps), positions
+
+
+#%%
+def calc_ancestry_frac_over_region(ts, source_popn, recip_popn, time_since_adm):
+    """
+    Calculates the fraction of ancestry from the source population seen in all
+    extant samples from the recipient population.
+
+    Parameters
+    ----------
+    ts : TreeSequence
+        TreeSeq with samples from recip_popn taken at "generations ago"
+        times 0, time_since_adm, and time_since_adm + 1,
+        and samples from source_popn taken at time_since_adm + 1
+    source_popn : int
+        Population id number of source/introgressing population from SLiM sim.
+    recip_popn : int
+        Population id number of recipient/extant population from SLiM sim..
+    time_since_adm : int
+        Time of admixture in generations ago.  Assumes samples were remembered
+        in late() stage of corresponding admixture generation within SLiM.
+
+    Returns
+    -------
+    list of floats
+        source ancestry fractions in each chromosome interval.
+    list of tuples
+        chromosome intervals (start, end) to which ancestry fractions correspond.
+
+    """
+    # TODO: recip_popn, source_popn, and time_since_adm could all be informed by model
+
+    time_just_before_adm = time_since_adm + 1  # in "generations ago"
+    time_just_after_adm = time_since_adm       # during the adm generation, SLiM remembers individuals after the admixture event happens
+
+    def peri_admixture_sample_lists(ts, just_before, just_after, source_popn, recip_popn):
+        # collect node ids for the relevant samples
+        source_samps_just_before = [ts.node(n).id for n in ts.samples(population=source_popn)
+                                    if (ts.node(n).time == time_just_before_adm)]
+        recip_samps_just_before = [ts.node(n).id for n in ts.samples(population=recip_popn)
+                                   if (ts.node(n).time == time_just_before_adm)]
+        recip_samps_just_after = [ts.node(n).id for n in ts.samples(population=recip_popn)
+                                  if (ts.node(n).time == time_just_after_adm)]
+        recip_samps_today = [ts.node(n).id for n in ts.samples(population=recip_popn)
+                             if (ts.node(n).time == 0)]
+        return source_samps_just_before, recip_samps_just_before, recip_samps_just_after, recip_samps_today
+
+    # Find the source samples that introgressed into recip by looking at the
+    # parents of the recipient population right after admixture.
+        #  this is a very slow way to find just a few remaining parents (vs. just looking at first tree as below)
+        # p3_first_parents = [ts.first().parent(i) for i in recip_samps_just_after]
+    # because it's slow, I'm going to try to simplify and see if that helps
+    s_b, r_b, r_a, r_t = peri_admixture_sample_lists(ts, time_just_before_adm, time_just_after_adm, source_popn, recip_popn)
+    samples_to_keep = np.concatenate((s_b, r_b, r_a, r_t))
+
+    sts = ts.simplify(samples=samples_to_keep)
+    # TODO: what precisely does reduce_to_site_topology do?
+        # It certainly has an effect:  simplified tree goes from 15k trees to 6.7k trees.
+    # After simplifying, now have new node ids for samples.  Need to split them out again.
+        # Could (1) go by length of array chunks
+        # (2) something with map_nodes=True in simplify call
+        # (3) do same listcomps as above
+        # (4) take the whole issue to SLiM and try to flag the intogressors specifically
+    # For now, do option (3) via helper function.
+
+    # these are being overwritten into new node_ids in the simplified ts world
+    # populations are now zero-indexed.  Maybe I could prevent this by doing a pyslim loading?
+    s_b, r_b, r_a, r_t = peri_admixture_sample_lists(sts, time_just_before_adm, time_just_after_adm, source_popn-1, recip_popn-1)
+
+    recip_parents_whole_chr = [[t.parent(i) for i in r_a] for t in sts.trees(sample_lists=True)]
+    recip_parents = np.unique(recip_parents_whole_chr)
+    # all of the recip parents should be samples, not untracked nodes
+    assert np.all([sts.node(p).is_sample() for p in recip_parents])
+    recip_parents_from_source = [p for p in recip_parents if (p in s_b)]
+    recip_parents_from_recip = [p for p in recip_parents if (p in r_b)]
+    # all the parents must come from either p1 or p3
+    assert np.all(recip_parents_from_source + recip_parents_from_recip == recip_parents)
+
+    # What is this trying to do?
+    # # my original guess:
+    # Return the fraction of all the "living"
+    # (i.e. alive at end of simulation) recipient haplotypes that trace their
+    # ancestry to the introgressing population.
+    # This should be 10% in a "null" model, as the introgression event makes
+    # the recipient population 90% recipient, 10% donor (in model 0, 90% pop3, 10% pop1).
+    # # what I think now is largely the same
+        # tree_p has length of ts.num_trees
+        # for each tree (chr interval), give fract [as above].
+    # TODO: check on ability to make u a list.  suggested in docs
+    source_anc_frac_by_tree = [sum([t.num_tracked_samples(u) for u in recip_parents_from_source]) / len(r_t)
+              for t in sts.trees(tracked_samples=r_t, sample_lists=True)]
+    assert sts.num_trees == len(source_anc_frac_by_tree)
+    # grab the windows too
+    source_anc_tree_intervals = [t.interval for t in sts.trees()]
+    return source_anc_frac_by_tree, source_anc_tree_intervals
