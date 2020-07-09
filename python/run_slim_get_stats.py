@@ -77,7 +77,7 @@ def calc_p1ancestry (treepath, source_popn, t_sinceadm, model):
     # So this is a per tree average.
     return meanp1
 
-def ancestry_p_varies(ts, source_popn, time_since_adm, model):
+def calc_ancestry_p_windows(ts, source_popn, time_since_adm, model):
     # TODO: surely source_popn and time_since_adm could all be informed by model
     if model == 1:
         recip_popn = 4
