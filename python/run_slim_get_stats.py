@@ -87,32 +87,51 @@ def ancestry_p_varies(ts, source_popn, time_since_adm, model):
     time_just_before_adm = time_since_adm + 1  # in "generations ago"
     time_just_after_adm = time_since_adm       # during the adm generation, SLiM remembers individuals after the admixture event happens
 
-    # collect node ids for the relevant samples
-    source_samps_just_before = [ts.node(n).id for n in ts.samples(population=source_popn)
-                                if (ts.node(n).time == time_just_before_adm)]
-    # TODO: [perf] consider not looping through same ts.samples() three times
-    recip_samps_just_before = [ts.node(n).id for n in ts.samples(population=recip_popn)
-                               if (ts.node(n).time == time_just_before_adm)]
-    recip_samps_just_after = [ts.node(n).id for n in ts.samples(population=recip_popn)
-                              if (ts.node(n).time == time_just_after_adm)]
-    recip_samps_today = [ts.node(n).id for n in ts.samples(population=recip_popn)
-                         if (ts.node(n).time == 0)]
+    def peri_admixture_sample_lists(ts, just_before, just_after, source_popn, recip_popn):
+        # collect node ids for the relevant samples
+        source_samps_just_before = [ts.node(n).id for n in ts.samples(population=source_popn)
+                                    if (ts.node(n).time == time_just_before_adm)]
+        recip_samps_just_before = [ts.node(n).id for n in ts.samples(population=recip_popn)
+                                   if (ts.node(n).time == time_just_before_adm)]
+        recip_samps_just_after = [ts.node(n).id for n in ts.samples(population=recip_popn)
+                                  if (ts.node(n).time == time_just_after_adm)]
+        recip_samps_today = [ts.node(n).id for n in ts.samples(population=recip_popn)
+                             if (ts.node(n).time == 0)]
+        return source_samps_just_before, recip_samps_just_before, recip_samps_just_after, recip_samps_today
+
     # Find the source samples that introgressed into recip by looking at the
     # parents of the recipient population right after admixture.
         #  this is a very slow way to find just a few remaining parents (vs. just looking at first tree as below)
         # p3_first_parents = [ts.first().parent(i) for i in recip_samps_just_after]
+    # because it's slow, I'm going to try to simplify and see if that helps
+    s_b, r_b, r_a, r_t = peri_admixture_sample_lists(ts, time_just_before_adm, time_just_after_adm, source_popn, recip_popn)
+    samples_to_keep = np.concatenate((s_b, r_b, r_a, r_t))
 
-    recip_parents_whole_chr = [[t.parent(i) for i in recip_samps_just_after] for t in ts.trees(sample_lists=True)]
+    sts = ts.simplify(samples=samples_to_keep)
+    # TODO: what precisely does reduce_to_site_topology do?
+        # It certainly has an effect:  simplified tree goes from 15k trees to 6.7k trees.
+    # After simplifying, now have new node ids for samples.  Need to split them out again.
+        # Could (1) go by length of array chunks
+        # (2) something with map_nodes=True in simplify call
+        # (3) do same listcomps as above
+        # (4) take the whole issue to SLiM and try to flag the intogressors specifically
+    # For now, do option (3) via helper function.
+
+    # these are being overwritten into new node_ids in the simplified ts world
+    # populations are now zero-indexed.  Maybe I could prevent this by doing a pyslim loading?
+    s_b, r_b, r_a, r_t = peri_admixture_sample_lists(sts, time_just_before_adm, time_just_after_adm, source_popn-1, recip_popn-1)
+
+    recip_parents_whole_chr = [[t.parent(i) for i in r_a] for t in sts.trees(sample_lists=True)]
     recip_parents = np.unique(recip_parents_whole_chr)
     # all of the recip parents should be samples, not untracked nodes
-    assert np.all([ts.node(p).is_sample() for p in recip_parents])
-    recip_parents_from_source = [p for p in recip_parents if (p in source_samps_just_before)]
-    recip_parents_from_recip = [p for p in recip_parents if (p in recip_samps_just_before)]
+    assert np.all([sts.node(p).is_sample() for p in recip_parents])
+    recip_parents_from_source = [p for p in recip_parents if (p in s_b)]
+    recip_parents_from_recip = [p for p in recip_parents if (p in r_b)]
     # all the parents must come from either p1 or p3
     assert np.all(recip_parents_from_source + recip_parents_from_recip == recip_parents)
 
-    tree_p = [sum([t.num_tracked_samples(u) for u in recip_parents_from_source]) / len(recip_samps_today)
-              for t in ts.trees(tracked_samples=recip_samps_today, sample_lists=True)]
+    tree_p = [sum([t.num_tracked_samples(u) for u in recip_parents_from_source]) / len(r_t)
+              for t in sts.trees(tracked_samples=r_t, sample_lists=True)]
     # TODO: check on ability to make u a list.  suggested in docs
 
     # What is this trying to do?
