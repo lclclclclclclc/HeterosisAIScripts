@@ -236,21 +236,41 @@ def calc_ancestry_frac_over_region(ts, source_popn, recip_popn, time_since_adm):
         chromosome intervals (start, end) to which ancestry fractions correspond.
 
     """
-    # TODO: recip_popn, source_popn, and time_since_adm could all be informed by model
+    def translate_from_slim_pop(tree_seq, s_ids=None):
+        popkey = [(p.id, p.metadata.slim_id) for p in tree_seq.populations()
+                  if p.metadata is not None]
+        pops = [p for (p, s) in popkey]
+        slims = [s for (p, s) in popkey]
+        if s_ids is None:  # just get all populations with a slim_id
+            s_ids = slims
+        indices_of_slim_pops = np.where(np.isin(slims, s_ids))[0]
+        return tuple(np.asarray(pops)[indices_of_slim_pops])
+    # check that the populations exist as expected in the original, recaped tree
+    assert (source_popn, recip_popn) == translate_from_slim_pop(ts, (source_popn, recip_popn))
 
+    # check that we got the recapitated treeseq
+    assert max(t.num_roots for t in ts.trees()) == 1
+
+    # TODO: recip_popn, source_popn, and time_since_adm could all be informed by model
     time_just_before_adm = time_since_adm + 1  # in "generations ago"
     time_just_after_adm = time_since_adm       # during the adm generation, SLiM remembers individuals after the admixture event happens
 
-    def peri_admixture_sample_lists(ts, just_before, just_after, source_popn, recip_popn):
+    def peri_admixture_sample_lists(tree_seq, source_popn, recip_popn, just_before, just_after):
+        # translate slim population ids into the ts frame of reference
+        source, recip = translate_from_slim_pop(tree_seq, (source_popn, recip_popn))
         # collect node ids for the relevant samples
-        source_samps_just_before = [ts.node(n).id for n in ts.samples(population=source_popn)
-                                    if (ts.node(n).time == time_just_before_adm)]
-        recip_samps_just_before = [ts.node(n).id for n in ts.samples(population=recip_popn)
-                                   if (ts.node(n).time == time_just_before_adm)]
-        recip_samps_just_after = [ts.node(n).id for n in ts.samples(population=recip_popn)
-                                  if (ts.node(n).time == time_just_after_adm)]
-        recip_samps_today = [ts.node(n).id for n in ts.samples(population=recip_popn)
-                             if (ts.node(n).time == 0)]
+        source_samps_just_before = [tree_seq.node(n).id for
+                                    n in tree_seq.samples(population=source)
+                                    if (tree_seq.node(n).time == just_before)]
+        recip_samps_just_before = [tree_seq.node(n).id for
+                                   n in tree_seq.samples(population=recip)
+                                   if (tree_seq.node(n).time == just_before)]
+        recip_samps_just_after = [tree_seq.node(n).id for
+                                  n in tree_seq.samples(population=recip)
+                                  if (tree_seq.node(n).time == just_after)]
+        recip_samps_today = [tree_seq.node(n).id for
+                             n in tree_seq.samples(population=recip)
+                             if (tree_seq.node(n).time == 0)]
         return source_samps_just_before, recip_samps_just_before, recip_samps_just_after, recip_samps_today
 
     # Find the source samples that introgressed into recip by looking at the
@@ -258,7 +278,9 @@ def calc_ancestry_frac_over_region(ts, source_popn, recip_popn, time_since_adm):
         #  this is a very slow way to find just a few remaining parents (vs. just looking at first tree as below)
         # p3_first_parents = [ts.first().parent(i) for i in recip_samps_just_after]
     # because it's slow, I'm going to try to simplify and see if that helps
-    s_b, r_b, r_a, r_t = peri_admixture_sample_lists(ts, time_just_before_adm, time_just_after_adm, source_popn, recip_popn)
+    s_b, r_b, r_a, r_t = peri_admixture_sample_lists(ts, source_popn, recip_popn,
+                                                     time_just_before_adm,
+                                                     time_just_after_adm)
     samples_to_keep = np.concatenate((s_b, r_b, r_a, r_t))
 
     sts = ts.simplify(samples=samples_to_keep)
@@ -272,10 +294,9 @@ def calc_ancestry_frac_over_region(ts, source_popn, recip_popn, time_since_adm):
     # For now, do option (3) via helper function.
 
     # these are being overwritten into new node_ids in the simplified ts world
-    # populations are now zero-indexed.  Maybe I could prevent this by doing a pyslim loading?
-    s_b, r_b, r_a, r_t = peri_admixture_sample_lists(sts, time_just_before_adm, time_just_after_adm, source_popn-1, recip_popn-1)
-
-    # TODO: !! I am not always returning any extant recipient nodes.  Why?
+    s_b, r_b, r_a, r_t = peri_admixture_sample_lists(sts, source_popn, recip_popn,
+                                                     time_just_before_adm,
+                                                     time_just_after_adm)
     assert len(r_t) > 0
 
     recip_parents_whole_chr = [[t.parent(i) for i in r_a] for t in sts.trees(sample_lists=True)]
@@ -302,7 +323,6 @@ def calc_ancestry_frac_over_region(ts, source_popn, recip_popn, time_since_adm):
         print("lost all source ancestry")
     elif len(recip_parents_from_recip) < 1:
         print("lost all recip ancestry")
-    print(f"{len(r_t)} (denominator) recip samples from today")
     source_anc_sum_by_tree = [sum([t.num_tracked_samples(u) for u in recip_parents_from_source]) for t in sts.trees(tracked_samples=r_t, sample_lists=True)]
     source_anc_frac_by_tree = np.asarray(source_anc_sum_by_tree) / len(r_t)
     assert sts.num_trees == len(source_anc_frac_by_tree)
