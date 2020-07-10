@@ -70,12 +70,13 @@ num_reps = int(args.numrep_id)
 
 # No earthly idea why this is implemented like this.
 # TODO: scrap the file i/o but keep the digitization
-def calc_ancestry_window (ancestry_fracs, intervals, len_genome=5000000):
+def calc_ancestry_window (ancestry_fracs, intervals, num_windows=100, len_genome=None):
     # TODO: actually fix the window size hardcoding
-    num_windows = 100
-    allpos_bin = np.linspace(0,len_genome,num_windows) #windows of every 50kb
-
     end_positions = np.asarray([i[1] for i in intervals])
+    if len_genome is None:  # just figure it out from intervals
+        len_genome = max(end_positions)
+    allpos_bin = np.linspace(0,len_genome, num_windows) #windows of every 50kb
+
     endpos_digitized = np.digitize(end_positions, allpos_bin)
     ancestry = np.asarray(ancestry_fracs)
 
@@ -226,13 +227,12 @@ def vSumFunc(other_hap, currentArchi,p1_hapw):
     return np.add.reduce(div, 1)
 
 
-def calc_stats (trees_filename):
-
+def calc_stats (trees_filename, sample_size, num_windows=100):
     ts = pyslim.load(trees_filename)
-    (p1_hap, p2_hap, p3_hap), all_pos = tt.sample_population_haplotypes(ts, check_loc=insert_ai)
+    (p1_hap, p2_hap, p3_hap), all_pos = tt.sample_population_haplotypes(ts, n_haps=int(sample_size), check_loc=insert_ai)
 
     len_genome = ts.sequence_length
-    allpos_bin = np.linspace(0,len_genome,int(len_genome/50000)) #windows of every 50kb
+    allpos_bin = np.linspace(0,len_genome,num_windows) #windows of every 50kb
     allpos_digitized = np.digitize(all_pos, allpos_bin)
 
     Dstat_list = []
@@ -251,7 +251,7 @@ def calc_stats (trees_filename):
     pos_end = []
 
 
-    for w in range(1,100):  # etc: hardcoded here, but above was int(len_genome/50000)
+    for w in range(1,num_windows):  # etc: hardcoded here, but above was int(len_genome/50000)
         these_pos = all_pos[allpos_digitized==w]
 
         if len(these_pos)>1:
@@ -509,8 +509,8 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
     trees_filename = dir_stem + 'output/trees/'+str(region_name)+'_m'+str(model)+'_sex'+str(sex)+'.trees'
     new_par = DIR_par +"par_"+region_name+str(dominance)+str(model)+ str(sex)+str(n)+".txt"
 
-    segsize = 5000000  # nice that this is here, but hardcoded everywhere else
-
+# etc: why were these vales not used in writing par files????
+# TODO: send these to update_par_file
     if model ==1:  # etc: not handling this model yet
         if dominance != 2:
             temp_par = dir_stem + "slim/modelh_neg.txt"
@@ -518,9 +518,8 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
             temp_par = dir_stem + "slim/modelh_neu.txt"
         adm_gen = (87400-1)/nscale
         end_gen = 89000/nscale
-        t_end = 1600/nscale -1
+        # t_end = 1600/nscale -1
         popsize=41080/nscale # recipient population size at the end of simulation
-
         if growth ==1:
             popsize = 550/nscale
         elif growth ==2:
@@ -529,11 +528,10 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
             popsize = 7300/nscale
         elif growth ==4:
             popsize = 41080/nscale
-        source_popn = 2
+        source_popn = 2  # etc: not sure
         recip_popn = 4  # etc: not sure
 
     elif model == 0:
-        # etc: why were these timepoints not used in writing par files????
         if dominance !=2:
             temp_par = dir_stem + "slim/ts_model0_neg.slim"
             adm_gen = 120000/nscale
@@ -543,13 +541,12 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
             # recap'ing obviates need for 10k of SLiM burn-in in neutral model
             adm_gen = 20000/nscale
             end_gen = 30000/nscale
-
-        # etc: why were these values not used in writing par files????
-        t_end = 10000 / nscale  # etc: this means generations elapsed from admixture to end of simulation (present)
-        popsize = 1000 / nscale  # size of p3 (as split off from p2 in mod0)
+        popsize = 1000 / nscale  # extant size of p3 (as split off from p2 in mod0)
         source_popn = 1
         recip_popn = 3
-        adm_gens_ago = end_gen - adm_gen
+
+    # segsize = 5000000  # nice that this is here, but hardcoded everywhere else
+    adm_gens_ago = end_gen - adm_gen
 
     update_par_file(temp_par, new_par, model, growth, dominance,
                     nscale, m4s, hs, insert_ai, sex, trees_filename+'.orig',
@@ -573,10 +570,11 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
     # Calculate how much source ancestry is present in today's recipient popn
     source_anc_fracs, intervals = tt.calc_ancestry_frac_over_region(ts, source_popn, recip_popn, adm_gens_ago)
     mean_source_anc = np.mean(source_anc_fracs)
-    source_anc_by_window = calc_ancestry_window(source_anc_fracs, intervals) #get mean ancestry per 50kb window
+        # Mean ancestry per 50kb window
+    source_anc_by_window = calc_ancestry_window(source_anc_fracs, intervals)
 
     # Calculate other statistics from genotype matrices
-    pos_start,pos_end,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list = calc_stats(trees_filename)
+    pos_start,pos_end,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list = calc_stats(trees_filename, sample_size=popsize)
 
     q.put([n,insert_ai,growth,mean_source_anc,pos_start,pos_end,source_anc_by_window, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
     #other parameter info are stored in the output file name
@@ -586,22 +584,17 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
     # os.system('rm '+new_par)
 
 
-def write_to_file(windowfile_name,q):
-    windowfile = open(windowfile_name,'w')
-
+def write_to_file(windowfile_name, q):
+    windowfile = open(windowfile_name, 'w')
     while 1:  # etc: terrifying
         q_elem = q.get()
-
         if q_elem=='kill': # break if end of queue
             print ('END OF SIMULATIONS')
             break
-
         [n,insert_ai,growth,meanp1,pos_start,pos_end,anc_window,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list] = q_elem
         for i in range(len(Dstat_list)):
             windowfile.write("%d\t%d\t%d\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (n,insert_ai,growth,meanp1,pos_start[i],pos_end[i],anc_window[i],Dstat_list[i], fD_list[i], Het_list[i], divratioavg_list[i],Q_1_100_q95_list[i],Q_1_100_q90_list[i],Q_1_100_max_list[i],U_1_0_100_list[i],U_1_20_100_list[i],U_1_50_100_list[i],U_1_80_100_list[i]))
-
         windowfile.flush()
-
     windowfile.close()
 
 
@@ -615,9 +608,9 @@ if __name__=='__main__':
     #growth = 4
     #hs = 0 #0 = recessive or neutral; 1 = hs relationship
     dominance = 0 #if 0, run the deleterious recessive model #if 2, run the neutral model
-    nscale = 10 #define scaling factor
+    nscale = 100 #define scaling factor
     m4s = 0.01 #adaptive selection strength
-    num_reps=1 #number of simulations per region
+    num_reps=10 #number of simulations per region
     region_all = ["chr11max","chr19region","chr3region","galnt18","hla","hyal2",
                   "krt71","nlrc5","oca2","pde6c","pou2f3","rnf34","sema6d","sgcb",
                   "sgcz","sipa1l2","slc16a11","slc19a3","slc5a10","stat2","tbx15",
@@ -658,9 +651,9 @@ if __name__=='__main__':
     pool.close()
     pool.join()
 
-    # peek at first line of stats file to check in on things
-    with open(windowfile_name, 'r') as f:
-        print("First line of stats file for this run is below.")
-        print(f.readline())
+    # # peek at first line of stats file to check in on things
+    # with open(windowfile_name, 'r') as f:
+    #     print("First line of stats file for this run is below.")
+    #     print(f.readline())
 
     print("END OF SIMULATION")
