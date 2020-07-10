@@ -275,6 +275,9 @@ def calc_ancestry_frac_over_region(ts, source_popn, recip_popn, time_since_adm):
     # populations are now zero-indexed.  Maybe I could prevent this by doing a pyslim loading?
     s_b, r_b, r_a, r_t = peri_admixture_sample_lists(sts, time_just_before_adm, time_just_after_adm, source_popn-1, recip_popn-1)
 
+    # TODO: !! I am not always returning any extant recipient nodes.  Why?
+    assert len(r_t) > 0
+
     recip_parents_whole_chr = [[t.parent(i) for i in r_a] for t in sts.trees(sample_lists=True)]
     recip_parents = np.unique(recip_parents_whole_chr)
     # all of the recip parents should be samples, not untracked nodes
@@ -295,8 +298,13 @@ def calc_ancestry_frac_over_region(ts, source_popn, recip_popn, time_since_adm):
         # tree_p has length of ts.num_trees
         # for each tree (chr interval), give fract [as above].
     # TODO: check on ability to make u a list.  suggested in docs
-    source_anc_frac_by_tree = [sum([t.num_tracked_samples(u) for u in recip_parents_from_source]) / len(r_t)
-              for t in sts.trees(tracked_samples=r_t, sample_lists=True)]
+    if len(recip_parents_from_source) < 1:
+        print("lost all source ancestry")
+    elif len(recip_parents_from_recip) < 1:
+        print("lost all recip ancestry")
+    print(f"{len(r_t)} (denominator) recip samples from today")
+    source_anc_sum_by_tree = [sum([t.num_tracked_samples(u) for u in recip_parents_from_source]) for t in sts.trees(tracked_samples=r_t, sample_lists=True)]
+    source_anc_frac_by_tree = np.asarray(source_anc_sum_by_tree) / len(r_t)
     assert sts.num_trees == len(source_anc_frac_by_tree)
     # grab the windows too
     source_anc_tree_intervals = [t.interval for t in sts.trees()]
