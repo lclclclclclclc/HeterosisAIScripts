@@ -71,29 +71,36 @@ num_reps = int(args.numrep_id)
 # No earthly idea why this is implemented like this.
 # TODO: scrap the file i/o but keep the digitization
 def calc_ancestry_window (ancestry_fracs, intervals, num_windows=100, len_genome=None):
-    # TODO: actually fix the window size hardcoding
+
+    start_positions = np.asarray([i[0] for i in intervals])
     end_positions = np.asarray([i[1] for i in intervals])
+    interval_spans = end_positions - start_positions
+
+    # TODO: actually fix the window size hardcoding
     if len_genome is None:  # just figure it out from intervals
         len_genome = max(end_positions)
     allpos_bin = np.linspace(0,len_genome, num_windows) #windows of every 50kb
-
     endpos_digitized = np.digitize(end_positions, allpos_bin)
-    ancestry = np.asarray(ancestry_fracs)
 
-    anc_window = []
-    anc_pos = []
+    ancestry_fracs = np.asarray(ancestry_fracs)
+    anc_frac_by_window = []
+    anc_windows = []
     for w in range(1, num_windows):
-        these_pos = end_positions[endpos_digitized==w]
-        these_anc = ancestry[endpos_digitized==w]
+        window_mask = endpos_digitized==w
+        if np.any(window_mask):
+            window_start = min(start_positions[window_mask])
+            window_end = max(end_positions[window_mask])
+            anc_windows.append((window_start, window_end))
 
-        if(len(these_pos))>0:
-            anc_window.append(np.mean(these_anc))
-            anc_pos.append(these_pos)
+            these_spans = interval_spans[window_mask]
+            these_anc = ancestry_fracs[window_mask]
+
+            anc_frac_by_window.append(np.average(these_anc, weights=these_spans))
         else:
-            anc_window.append(float('nan'))
-            anc_pos.append(these_pos)
+            anc_windows.append((float('nan'), float('nan')))
+            anc_frac_by_window.append(float('nan'))
 
-    return anc_window
+    return anc_frac_by_window, anc_windows
 
 
 def find_ai_site (segfile): #find an exon in the mid-range of the segment to insert AI mutation
@@ -481,12 +488,12 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
     source_anc_fracs, intervals = tt.calc_ancestry_frac_over_region(ts, source_popn, recip_popn, adm_gens_ago)
     mean_source_anc = np.mean(source_anc_fracs)
         # Mean ancestry per 50kb window
-    source_anc_by_window = calc_ancestry_window(source_anc_fracs, intervals)
+    anc_by_window, anc_windows = calc_ancestry_window(source_anc_fracs, intervals)
 
     # Calculate other statistics from genotype matrices
     pos_start,pos_end,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list = calc_stats(trees_filename, sample_size=popsize)
 
-    q.put([n,insert_ai,growth,mean_source_anc,pos_start,pos_end,source_anc_by_window, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
+    q.put([n,insert_ai,growth,mean_source_anc,pos_start,pos_end,anc_by_window, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
     #other parameter info are stored in the output file name
 
     # os.system('rm '+slim_output)
