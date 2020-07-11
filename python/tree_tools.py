@@ -139,8 +139,20 @@ def throw_neutral_muts(tree_file, region_info_file, neu_or_neg=0,
 
     return ts
 
-#%%
 
+#%%
+def translate_from_slim_pop(tree_seq, s_ids=None):
+    popkey = [(p.id, p.metadata.slim_id) for p in tree_seq.populations()
+              if p.metadata is not None]
+    pops = [p for (p, s) in popkey]
+    slims = [s for (p, s) in popkey]
+    if s_ids is None:  # just get all populations with a slim_id
+        s_ids = slims
+    indices_of_slim_pops = np.where(np.isin(slims, s_ids))[0]
+    return tuple(np.asarray(pops)[indices_of_slim_pops])
+
+
+#%%
 def sample_population_haplotypes(ts, popn_ids=(1,2,3), n_haps=100, check_loc=None):
     """
     Using a tree sequence, takes extant samples from three populations
@@ -169,6 +181,7 @@ def sample_population_haplotypes(ts, popn_ids=(1,2,3), n_haps=100, check_loc=Non
         Locations of each variant (matrix column) in SLiM chromosome coordinates.
 
     """
+    ts_popn_ids = translate_from_slim_pop(ts, s_ids=popn_ids)
 
     def sample_extant_haplotypes(population, n_haps):
         # TODO: later, make sure this is a sample with the correct sex ratio.
@@ -179,9 +192,9 @@ def sample_population_haplotypes(ts, popn_ids=(1,2,3), n_haps=100, check_loc=Non
     ## Sample down to n_haps extant nodes per population
     # TODO: should I be sampling individuals and keeping both their nodes?
     #       perhaps not if I want to do same for sex chromosomes
-    extant_samples = np.concatenate((sample_extant_haplotypes(popn_ids[0], n_haps),
-                                    sample_extant_haplotypes(popn_ids[1], n_haps),
-                                    sample_extant_haplotypes(popn_ids[2], n_haps)))
+    extant_samples = np.concatenate((sample_extant_haplotypes(ts_popn_ids[0], n_haps),
+                                    sample_extant_haplotypes(ts_popn_ids[1], n_haps),
+                                    sample_extant_haplotypes(ts_popn_ids[2], n_haps)))
     # reduce ts to only these samples so the matrix isn't too big
     sts = ts.simplify(samples=extant_samples, reduce_to_site_topology=True)
         # In the returned tree sequence, the node with ID 0 corresponds to samples[0], node 1 corresponds to samples[1], and so on. Besides the samples, node IDs in the returned tree sequence are then allocated sequentially in time order.
@@ -236,15 +249,6 @@ def calc_ancestry_frac_over_region(ts, source_popn, recip_popn, time_since_adm):
         chromosome intervals (start, end) to which ancestry fractions correspond.
 
     """
-    def translate_from_slim_pop(tree_seq, s_ids=None):
-        popkey = [(p.id, p.metadata.slim_id) for p in tree_seq.populations()
-                  if p.metadata is not None]
-        pops = [p for (p, s) in popkey]
-        slims = [s for (p, s) in popkey]
-        if s_ids is None:  # just get all populations with a slim_id
-            s_ids = slims
-        indices_of_slim_pops = np.where(np.isin(slims, s_ids))[0]
-        return tuple(np.asarray(pops)[indices_of_slim_pops])
     # check that the populations exist as expected in the original, recaped tree
     assert (source_popn, recip_popn) == translate_from_slim_pop(ts, (source_popn, recip_popn))
 
@@ -323,9 +327,12 @@ def calc_ancestry_frac_over_region(ts, source_popn, recip_popn, time_since_adm):
         print("lost all source ancestry")
     elif len(recip_parents_from_recip) < 1:
         print("lost all recip ancestry")
-    source_anc_sum_by_tree = [sum([t.num_tracked_samples(u) for u in recip_parents_from_source]) for t in sts.trees(tracked_samples=r_t, sample_lists=True)]
+    source_anc_sum_by_tree = [sum([t.num_tracked_samples(u) for u in recip_parents_from_source])
+                              for t in sts.trees(tracked_samples=r_t, sample_lists=True)]
     source_anc_frac_by_tree = np.asarray(source_anc_sum_by_tree) / len(r_t)
     assert sts.num_trees == len(source_anc_frac_by_tree)
-    # grab the windows too
+    # grab the windows and the sequence-wide weighted average
     source_anc_tree_intervals = [t.interval for t in sts.trees()]
-    return source_anc_frac_by_tree, source_anc_tree_intervals
+    interval_spans = [t.span for t in sts.trees()]
+    mean_source_anc = np.average(source_anc_frac_by_tree, weights=interval_spans)
+    return mean_source_anc, source_anc_frac_by_tree, source_anc_tree_intervals

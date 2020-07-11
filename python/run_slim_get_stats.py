@@ -71,121 +71,37 @@ num_reps = int(args.numrep_id)
 # No earthly idea why this is implemented like this.
 # TODO: scrap the file i/o but keep the digitization
 def calc_ancestry_window (ancestry_fracs, intervals, num_windows=100, len_genome=None):
-    # TODO: actually fix the window size hardcoding
+
+    start_positions = np.asarray([i[0] for i in intervals])
     end_positions = np.asarray([i[1] for i in intervals])
+    interval_spans = end_positions - start_positions
+
+    # TODO: actually fix the window size hardcoding
     if len_genome is None:  # just figure it out from intervals
         len_genome = max(end_positions)
     allpos_bin = np.linspace(0,len_genome, num_windows) #windows of every 50kb
-
     endpos_digitized = np.digitize(end_positions, allpos_bin)
-    ancestry = np.asarray(ancestry_fracs)
 
-    anc_window = []
-    anc_pos = []
+    ancestry_fracs = np.asarray(ancestry_fracs)
+    anc_frac_by_window = []
+    anc_windows = []
     for w in range(1, num_windows):
-        these_pos = end_positions[endpos_digitized==w]
-        these_anc = ancestry[endpos_digitized==w]
+        window_mask = endpos_digitized==w
+        if np.any(window_mask):
+            window_start = min(start_positions[window_mask])
+            window_end = max(end_positions[window_mask])
+            anc_windows.append((window_start, window_end))
 
-        if(len(these_pos))>0:
-            anc_window.append(np.mean(these_anc))
-            anc_pos.append(these_pos)
+            these_spans = interval_spans[window_mask]
+            these_anc = ancestry_fracs[window_mask]
+
+            anc_frac_by_window.append(np.average(these_anc, weights=these_spans))
         else:
-            anc_window.append(float('nan'))
-            anc_pos.append(these_pos)
+            anc_windows.append((float('nan'), float('nan')))
+            anc_frac_by_window.append(float('nan'))
 
-    return anc_window
+    return anc_frac_by_window, anc_windows
 
-
-# # NEVER CALLED
-# import glob
-# import matplotlib.pyplot
-# # just copied from SLiM manual 17.5
-# def ancestry_local (treepath):
-#     starts, ends, subpops = [], [], []
-#     ts = pyslim.load(treepath)
-#     for tree in ts.trees(sample_counts=True):
-#         subpop_sum, subpop_weights = 0, 0
-#         for root in tree.roots:
-#             leaves_count = tree.num_samples(root) - 1
-#             subpop_sum += tree.population(root) * leaves_count
-#             subpop_weights += leaves_count
-#         starts.append(tree.interval[0])
-#         ends.append(tree.interval[1])
-#         subpops.append(subpop_sum / float(subpop_weights))
-#     x = [x for pair in zip(starts, ends) for x in pair]
-#     y = [x for x in subpops for _ in (0, 1)]
-#     matplotlib.pyplot.plot(x, y)
-#     matplotlib.pyplot.show()
-#     return x,y #x=genome positions; y = ancestry
-# # NEVER CALLED
-# def write_ancestry (DIR_tree, output_anc_file):
-#     tree_all = glob.glob(DIR_tree+'*.trees')
-#     with open(output_anc_file, 'w') as outfile:
-#         for file in tree_all:
-#             x,y = ancestry_local (file)
-#             for item in x:
-#                 outfile.write("%s\t" % item)
-#             outfile.write("\n")
-#             for item in y:
-#                 outfile.write("%s\t" % item)
-#             outfile.write("\n")
-
-
-def load_data_slim(file_path,len_genome,adm_gen,end_gen): # load slim's output
-# TODO: etc: why does freqp4_b/a just get overridden a bunch?.. It's zero'd out later ln. 184ish
-    pos_den, hapMat_den,freqp4_before,freqp4_after = get_pos_hap(file_path,'p1',len_genome,end_gen)
-    pos_afr, hapMat_afr,freqp4_before,freqp4_after = get_pos_hap(file_path,'p2',len_genome,end_gen)
-    pos_nonafr, hapMat_nonafr,freqp4_before,freqp4_after = get_pos_hap(file_path,'p3',len_genome,end_gen)
-    # pos_preadm, hapMat_preadm,freqp4_before,freqp4_after = get_pos_hap(file_path,'p3',len_genome,adm_gen)
-# TODO: either remove or utilize preadm info.
-    pos_preadm = 'pointless'
-    hapMat_preadm = 'pointless2'
-
-    # TODO: etc: just really wrong....?
-    # pos_den, hapMat_den,freqp4_before,freqp4_after = get_pos_hap(file_path,'p2',len_genome,end_gen)
-    # pos_afr, hapMat_afr,freqp4_before,freqp4_after = get_pos_hap(file_path,'p1',len_genome,end_gen)
-    # pos_nonafr, hapMat_nonafr,freqp4_before,freqp4_after = get_pos_hap(file_path,'p4',len_genome,end_gen)
-    # pos_preadm, hapMat_preadm,freqp4_before,freqp4_after = get_pos_hap(file_path,'p2',len_genome,adm_gen)
-
-    return pos_den, hapMat_den,pos_afr, hapMat_afr,pos_nonafr, hapMat_nonafr,pos_preadm, hapMat_preadm,freqp4_before,freqp4_after
-
-
-def get_pos_hap(file_path,pop_id,len_genome,gen_time): #get pos and hapMat for a given pop from slim output
-# etc: no! not in slim output for mod0 code
-#   #OUT and SM header not in the output file when filepath is provided.  see manual 25.2.2
-#   The first line is a header in the same format as for outputSample(), as described in the previous section. The output type code here, SM, represents “sample, MS format”. The outputMSSample() method allows output to be sent to a file, with the optional filePath argument. In this case, the #OUT: header line is not emitted, since it would not be conformant with the MS data format specification.
-    infile = open(file_path,'r')
-    end=0
-    while end==0:
-        line = infile.readline()
-        if line[0:5]=='#OUT:': #output lines  # TODO: etc: lol no lines are marked #OUT:
-            fields = line.split()
-            out_type = fields[2]
-            pop = fields[3]
-            gen = fields[1]
-            if out_type=='SM' and pop==pop_id and int(gen) == gen_time: #ms lines
-                num_indiv = int(fields[4])
-                infile.readline() # skip //
-                infile.readline() # skip segsites
-                pos = (np.array(infile.readline().split()[1:]).astype(float) * len_genome).astype(int)
-                mult_mut_pos = find_mult_mut_pos(pos)+1
-                pos = np.delete(pos,mult_mut_pos)
-                hapMat = np.zeros((num_indiv,len(pos)),dtype=int)
-                for indiv in range(0,num_indiv):
-                    hap = np.array(list(infile.readline())[:-1]).astype(int)
-                    hap = np.delete(hap,mult_mut_pos)
-                    hapMat[indiv] = hap
-                freqp4_before = 0  # why is this just zero'd?  also overwritten in load_data_slim.. but then output??
-                freqp4_after = 0
-                end=1
-    infile.close()
-    return pos, hapMat,freqp4_before,freqp4_after
-
-
-def find_mult_mut_pos(pos): #find repeating mutations and remove them
-    dist = np.array([pos[i+1]-pos[i] for i in range(0,len(pos)-1)])
-    mult_mut_pos = np.where(dist==0)[0]
-    return mult_mut_pos
 
 def find_ai_site (segfile): #find an exon in the mid-range of the segment to insert AI mutation
     segs = open(segfile)
@@ -217,18 +133,18 @@ def calc_derived_freq (pop_hap):
     popfreq = popfreq/ float(pop_hap.shape[0])
     return popfreq
 
-def vSumFunc(other_hap, currentArchi,p1_hapw):
-    current_hap = np.array([p1_hapw[currentArchi,]])
-    div = np.zeros(other_hap.shape)
-    ones = np.ones((other_hap.shape[0],1))
-    current_hap = current_hap
-    current_hap_extended = np.dot(ones, current_hap)
-    div = np.logical_xor(current_hap_extended == 1, other_hap == 1)
-    return np.add.reduce(div, 1)
+## Keep for divratio re-implementation
+# def vSumFunc(other_hap, currentArchi,p1_hapw):
+#     current_hap = np.array([p1_hapw[currentArchi,]])
+#     div = np.zeros(other_hap.shape)
+#     ones = np.ones((other_hap.shape[0],1))
+#     current_hap = current_hap
+#     current_hap_extended = np.dot(ones, current_hap)
+#     div = np.logical_xor(current_hap_extended == 1, other_hap == 1)
+#     return np.add.reduce(div, 1)
 
 
-def calc_stats (trees_filename, sample_size, num_windows=100):
-    ts = pyslim.load(trees_filename)
+def calc_stats (ts, sample_size, num_windows=100):
     (p1_hap, p2_hap, p3_hap), all_pos = tt.sample_population_haplotypes(ts, n_haps=int(sample_size), check_loc=insert_ai)
 
     len_genome = ts.sequence_length
@@ -409,11 +325,11 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
                     fields[0] = str(int(10000/nscale))
                 elif line_counter == 80:  # admixture generation early()
                     fields[0] = str(int(20000/nscale))  # TODO: replace by adm_gen
-                elif line_counter == 90:  # admixture generation late()
+                elif line_counter == 85:  # admixture generation late()
                     fields[0] = str(int(20000/nscale)) # TODO: replace by adm_gen
-                elif line_counter == 96:  # final generation
+                elif line_counter == 91:  # final generation
                     fields[0] = str(int(30000/nscale))  # TODO: replace by end_gen
-                elif line_counter == 100:  # write out .trees
+                elif line_counter == 92:  # write out .trees
                     fields[0] = 'sim.treeSeqOutput("' + trees_filename + '");'
 
             elif m4s != 2:   # recessive deleterious "negative" background model
@@ -442,11 +358,11 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
                     fields[0] = str(int(110000/nscale))
                 elif line_counter == 98:  # admixture generation early()
                     fields[0] = str(int(120000/nscale))  # TODO: replace by adm_gen
-                elif line_counter == 107:  # admixture generation late()
+                elif line_counter == 103:  # admixture generation late()
                     fields[0] = str(int(120000/nscale))  # TODO: replace by adm_gen
-                elif line_counter == 113:  # final generation
+                elif line_counter == 109:  # final generation
                     fields[0] = str(int(130000/nscale))  # TODO: replace by end_gen
-                elif line_counter == 117:  # write out .trees
+                elif line_counter == 110:  # write out .trees
                     fields[0] = 'sim.treeSeqOutput("' + trees_filename + '");'
 
         elif model ==1:   #modelh
@@ -568,15 +484,14 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
                            neu_or_neg=dominance, n_scale=nscale)
 
     # Calculate how much source ancestry is present in today's recipient popn
-    source_anc_fracs, intervals = tt.calc_ancestry_frac_over_region(ts, source_popn, recip_popn, adm_gens_ago)
-    mean_source_anc = np.mean(source_anc_fracs)
+    mean_source_anc, source_anc_fracs, intervals = tt.calc_ancestry_frac_over_region(ts, source_popn, recip_popn, adm_gens_ago)
         # Mean ancestry per 50kb window
-    source_anc_by_window = calc_ancestry_window(source_anc_fracs, intervals)
+    anc_by_window, anc_windows = calc_ancestry_window(source_anc_fracs, intervals)
 
     # Calculate other statistics from genotype matrices
-    pos_start,pos_end,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list = calc_stats(trees_filename, sample_size=popsize)
+    pos_start,pos_end,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list = calc_stats(ts, sample_size=popsize)
 
-    q.put([n,insert_ai,growth,mean_source_anc,pos_start,pos_end,source_anc_by_window, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
+    q.put([n,insert_ai,growth,mean_source_anc,anc_windows, anc_by_window, pos_start,pos_end, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
     #other parameter info are stored in the output file name
 
     # os.system('rm '+slim_output)
@@ -591,9 +506,17 @@ def write_to_file(windowfile_name, q):
         if q_elem=='kill': # break if end of queue
             print ('END OF SIMULATIONS')
             break
-        [n,insert_ai,growth,meanp1,pos_start,pos_end,anc_window,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list] = q_elem
+        print(len(q_elem))
+        [n,insert_ai,growth,mean_source_anc,anc_windows, anc_by_window,pos_start,pos_end,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list] = q_elem
         for i in range(len(Dstat_list)):
-            windowfile.write("%d\t%d\t%d\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (n,insert_ai,growth,meanp1,pos_start[i],pos_end[i],anc_window[i],Dstat_list[i], fD_list[i], Het_list[i], divratioavg_list[i],Q_1_100_q95_list[i],Q_1_100_q90_list[i],Q_1_100_max_list[i],U_1_0_100_list[i],U_1_20_100_list[i],U_1_50_100_list[i],U_1_80_100_list[i]))
+            format_string = "%d\t%d\t%d\t%f\t%d\t%d\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n"
+            items_to_write = (n,insert_ai,growth,mean_source_anc,anc_windows[i][0], anc_windows[i][1], anc_by_window[i],pos_start[i],pos_end[i],Dstat_list[i], fD_list[i], Het_list[i], divratioavg_list[i],Q_1_100_q95_list[i],Q_1_100_q90_list[i],Q_1_100_max_list[i],U_1_0_100_list[i],U_1_20_100_list[i],U_1_50_100_list[i],U_1_80_100_list[i])
+            if i == 0:  # first line for each replicate
+                # Check that each item has a formatted location to go into
+                assert format_string.count('%') == len(items_to_write)
+            if np.isnan(anc_windows[i][0]):
+                format_string = "%d\t%d\t%d\t%f\t%f\t%f\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n"
+            windowfile.write(format_string % items_to_write)
         windowfile.flush()
     windowfile.close()
 
@@ -610,7 +533,7 @@ if __name__=='__main__':
     dominance = 0 #if 0, run the deleterious recessive model #if 2, run the neutral model
     nscale = 100 #define scaling factor
     m4s = 0.01 #adaptive selection strength
-    num_reps=10 #number of simulations per region
+    num_reps=1 #number of simulations per region
     region_all = ["chr11max","chr19region","chr3region","galnt18","hla","hyal2",
                   "krt71","nlrc5","oca2","pde6c","pou2f3","rnf34","sema6d","sgcb",
                   "sgcz","sipa1l2","slc16a11","slc19a3","slc5a10","stat2","tbx15",
@@ -634,6 +557,7 @@ if __name__=='__main__':
     insert_ai = int((int(window_end)+int(window_start))/2)
 
     attempt_num = np.random.randint(5000)
+    print(attempt_num)
     windowfile_name = dir_stem + "output/stats/20200709/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'-attempt' + str(attempt_num) + '_human_windows.txt'
     num_proc = 10
     manager = Manager()
