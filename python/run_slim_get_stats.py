@@ -144,8 +144,7 @@ def calc_derived_freq (pop_hap):
 #     return np.add.reduce(div, 1)
 
 
-def calc_stats (trees_filename, sample_size, num_windows=100):
-    ts = pyslim.load(trees_filename)
+def calc_stats (ts, sample_size, num_windows=100):
     (p1_hap, p2_hap, p3_hap), all_pos = tt.sample_population_haplotypes(ts, n_haps=int(sample_size), check_loc=insert_ai)
 
     len_genome = ts.sequence_length
@@ -491,7 +490,7 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
     anc_by_window, anc_windows = calc_ancestry_window(source_anc_fracs, intervals)
 
     # Calculate other statistics from genotype matrices
-    pos_start,pos_end,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list = calc_stats(trees_filename, sample_size=popsize)
+    pos_start,pos_end,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list = calc_stats(ts, sample_size=popsize)
 
     q.put([n,insert_ai,growth,mean_source_anc,pos_start,pos_end,anc_by_window, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
     #other parameter info are stored in the output file name
