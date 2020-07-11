@@ -506,9 +506,15 @@ def write_to_file(windowfile_name, q):
         if q_elem=='kill': # break if end of queue
             print ('END OF SIMULATIONS')
             break
+        print(len(q_elem))
+        format_string = "%d\t%d\t%d\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n"
         [n,insert_ai,growth,mean_source_anc,pos_start,pos_end,anc_by_window,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list] = q_elem
         for i in range(len(Dstat_list)):
-            windowfile.write("%d\t%d\t%d\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (n,insert_ai,growth,mean_source_anc,pos_start[i],pos_end[i],anc_by_window[i],Dstat_list[i], fD_list[i], Het_list[i], divratioavg_list[i],Q_1_100_q95_list[i],Q_1_100_q90_list[i],Q_1_100_max_list[i],U_1_0_100_list[i],U_1_20_100_list[i],U_1_50_100_list[i],U_1_80_100_list[i]))
+            items_to_write = (n,insert_ai,growth,mean_source_anc,pos_start[i],pos_end[i],anc_by_window[i],Dstat_list[i], fD_list[i], Het_list[i], divratioavg_list[i],Q_1_100_q95_list[i],Q_1_100_q90_list[i],Q_1_100_max_list[i],U_1_0_100_list[i],U_1_20_100_list[i],U_1_50_100_list[i],U_1_80_100_list[i])
+            if i == 0:  # first line for each replicate
+                # Check that each item has a formatted location to go into
+                assert format_string.count('%') == len(items_to_write)
+            windowfile.write(format_string % items_to_write)
         windowfile.flush()
     windowfile.close()
 
