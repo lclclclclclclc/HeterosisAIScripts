@@ -331,6 +331,8 @@ def calc_ancestry_frac_over_region(ts, source_popn, recip_popn, time_since_adm):
                               for t in sts.trees(tracked_samples=r_t, sample_lists=True)]
     source_anc_frac_by_tree = np.asarray(source_anc_sum_by_tree) / len(r_t)
     assert sts.num_trees == len(source_anc_frac_by_tree)
-    # grab the windows too
+    # grab the windows and the sequence-wide weighted average
     source_anc_tree_intervals = [t.interval for t in sts.trees()]
-    return source_anc_frac_by_tree, source_anc_tree_intervals
+    interval_spans = [t.span for t in sts.trees()]
+    mean_source_anc = np.average(source_anc_frac_by_tree, weights=interval_spans)
+    return mean_source_anc, source_anc_frac_by_tree, source_anc_tree_intervals

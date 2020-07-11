@@ -484,8 +484,7 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
                            neu_or_neg=dominance, n_scale=nscale)
 
     # Calculate how much source ancestry is present in today's recipient popn
-    source_anc_fracs, intervals = tt.calc_ancestry_frac_over_region(ts, source_popn, recip_popn, adm_gens_ago)
-    mean_source_anc = np.mean(source_anc_fracs)
+    mean_source_anc, source_anc_fracs, intervals = tt.calc_ancestry_frac_over_region(ts, source_popn, recip_popn, adm_gens_ago)
         # Mean ancestry per 50kb window
     anc_by_window, anc_windows = calc_ancestry_window(source_anc_fracs, intervals)
 
@@ -507,9 +506,9 @@ def write_to_file(windowfile_name, q):
         if q_elem=='kill': # break if end of queue
             print ('END OF SIMULATIONS')
             break
-        [n,insert_ai,growth,meanp1,pos_start,pos_end,anc_window,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list] = q_elem
+        [n,insert_ai,growth,mean_source_anc,pos_start,pos_end,anc_by_window,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list] = q_elem
         for i in range(len(Dstat_list)):
-            windowfile.write("%d\t%d\t%d\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (n,insert_ai,growth,meanp1,pos_start[i],pos_end[i],anc_window[i],Dstat_list[i], fD_list[i], Het_list[i], divratioavg_list[i],Q_1_100_q95_list[i],Q_1_100_q90_list[i],Q_1_100_max_list[i],U_1_0_100_list[i],U_1_20_100_list[i],U_1_50_100_list[i],U_1_80_100_list[i]))
+            windowfile.write("%d\t%d\t%d\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (n,insert_ai,growth,mean_source_anc,pos_start[i],pos_end[i],anc_by_window[i],Dstat_list[i], fD_list[i], Het_list[i], divratioavg_list[i],Q_1_100_q95_list[i],Q_1_100_q90_list[i],Q_1_100_max_list[i],U_1_0_100_list[i],U_1_20_100_list[i],U_1_50_100_list[i],U_1_80_100_list[i]))
         windowfile.flush()
     windowfile.close()
 
@@ -526,7 +525,7 @@ if __name__=='__main__':
     dominance = 0 #if 0, run the deleterious recessive model #if 2, run the neutral model
     nscale = 100 #define scaling factor
     m4s = 0.01 #adaptive selection strength
-    num_reps=5 #number of simulations per region
+    num_reps=1 #number of simulations per region
     region_all = ["chr11max","chr19region","chr3region","galnt18","hla","hyal2",
                   "krt71","nlrc5","oca2","pde6c","pou2f3","rnf34","sema6d","sgcb",
                   "sgcz","sipa1l2","slc16a11","slc19a3","slc5a10","stat2","tbx15",
