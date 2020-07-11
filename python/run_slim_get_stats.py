@@ -319,11 +319,11 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
                     fields[0] = str(int(10000/nscale))
                 elif line_counter == 80:  # admixture generation early()
                     fields[0] = str(int(20000/nscale))  # TODO: replace by adm_gen
-                elif line_counter == 90:  # admixture generation late()
+                elif line_counter == 85:  # admixture generation late()
                     fields[0] = str(int(20000/nscale)) # TODO: replace by adm_gen
-                elif line_counter == 96:  # final generation
+                elif line_counter == 91:  # final generation
                     fields[0] = str(int(30000/nscale))  # TODO: replace by end_gen
-                elif line_counter == 100:  # write out .trees
+                elif line_counter == 92:  # write out .trees
                     fields[0] = 'sim.treeSeqOutput("' + trees_filename + '");'
 
             elif m4s != 2:   # recessive deleterious "negative" background model
@@ -352,11 +352,11 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
                     fields[0] = str(int(110000/nscale))
                 elif line_counter == 98:  # admixture generation early()
                     fields[0] = str(int(120000/nscale))  # TODO: replace by adm_gen
-                elif line_counter == 107:  # admixture generation late()
+                elif line_counter == 103:  # admixture generation late()
                     fields[0] = str(int(120000/nscale))  # TODO: replace by adm_gen
-                elif line_counter == 113:  # final generation
+                elif line_counter == 109:  # final generation
                     fields[0] = str(int(130000/nscale))  # TODO: replace by end_gen
-                elif line_counter == 117:  # write out .trees
+                elif line_counter == 110:  # write out .trees
                     fields[0] = 'sim.treeSeqOutput("' + trees_filename + '");'
 
         elif model ==1:   #modelh
