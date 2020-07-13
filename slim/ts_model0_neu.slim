@@ -48,8 +48,10 @@ initialize() {
 12 late() {  // Keeping with original, AI emerges 100/n_scale generations after p1/p2 split.
 	if(m4s != 0.0){  // We introduce an adaptive variant.
 		target = sample(p1.genomes, 1);
-		target.addNewDrawnMutation(m4, 2500000 ); // TODO: change to insert_ai
-		// etc: critical change here from .outputFull to .treeSeqOutput
+		while (target.isNullGenome) {  // In X-chr simulation, we've chosen a Y-chr placeholder
+			target = sample(p1.genomes, 1);
+		}
+		target.addNewDrawnMutation(m4, 2500000 ); 
 		sim.treeSeqOutput("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/tmp/" + simnum + ".txt");
 	}
 }
@@ -66,6 +68,9 @@ initialize() {
 			sim.readFromPopulationFile("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/tmp/" + simnum + ".txt");
 			setSeed(getSeed() + 1);
 			target = sample(p1.genomes, 1);
+			while (target.isNullGenome) {  // In X-chr simulation, we've chosen a Y-chr placeholder
+				target = sample(p1.genomes, 1);
+			}
 			target.addNewDrawnMutation(m4, 2500000 );  // TODO: change to insert_ai
 		}
 	}
