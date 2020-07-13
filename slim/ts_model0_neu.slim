@@ -1,28 +1,19 @@
 initialize() {
-	defineConstant("dominance", 0 ); //recessive = 0; additive = 0.5;
-	defineConstant("n", 10 ); //scaling factor
-	defineConstant("m4s", 0.01 *n); //if m4s>0, adaptive introgression; else, deleterious null
+	defineConstant("dominance", 0 ); // unused in neutral model; recessive = 0; additive = 0.5;
+	defineConstant("n", 10 ); // scaling factor
+	defineConstant("m4s", 0.01 *n); // if m4s>0, adaptive introgression; else, deleterious null
 
-	// exon uses a mixture of syn and nonsyn at a 1:2.31 ratio (Huber et al.)
-	// to achieve an overall mutation rate of 1.5e-8, need 2.31/(1+2.31) fraction of all muts to be nonsyn
-	// i.e. ~0.6979 fraction of all muts IN EXONS should be the deleterious ones simulated here as "m1".
-	// the remaining ~0.3021 fraction of all mut.s IN EXONS should be thrown later as neutrals.
+	defineConstant("total_mu", 0);
+	initializeMutationRate(total_mu * n);
+	initializeMutationType("m1", 0.5, "f", 0); // placeholder type.  No mutations will be placed by SLiM
+	initializeMutationType("m4", 0.5, "f", 0.01*n); // adaptive
 
-	// For now, without mutation map, will have non-uniform mut. density along chr.
-	defineConstant("total_mu", 1.5e-8);
-	defineConstant("deleterious_fraction", 2.31/(1 + 2.31));
-	initializeMutationRate(total_mu * deleterious_fraction * n);
-	//nonsynonymous drawn from a DFE from Kim et al.
-	// importantly, SLiM computes the fitness of the heterozygote and homozygote as 1+sh and 1+s
-	// dadi and others compute it as 1+2sh and 1+2s
-	initializeMutationType("m1", dominance, "g", -0.01314833*n, 0.186);
-	initializeMutationType("m4", 0.5, "f", 0.01*n); //adaptive
-	//genomic element: exon and uses a mixture of syn and nonsyn at a 1:2.31 ratio (Huber et al.)
-	initializeGenomicElementType("g1", c(m1), c(2.31));
+	initializeGenomicElementType("g1", m1, 1); // placeholder type.  No mutations will be placed by SLiM
+	initializeGenomicElement(g1, 0, 4999999);
 
-	//read in exon and recomb info
+	// recombination
+	// read in recomb info.  Only relevant around AI locus, but think I have to initialize for whole sim.
 	info_lines = readFile("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/regions/sim_seq_info_sgcb.txt");
-	//recombination
 	rec_ends = NULL;
 	rec_rates = NULL;
 	for (line in info_lines[substr(info_lines, 0, 2) == "rec"])
@@ -33,21 +24,13 @@ initialize() {
 	}
 	//multiply rec rates by scaling factor
 	initializeRecombinationRate(0.5*(1-(1-2*rec_rates)^n), rec_ends);
-	//exons
-	for (line in info_lines[substr(info_lines, 0, 2) == "exo"])
-	{
-		components = strsplit(line, " ");
-		neu_starts = asInteger(components[1]);
-		neu_ends = asInteger(components[2]);
-		initializeGenomicElement(g1, neu_starts, neu_ends);
-	}
 
 	initializeTreeSeq();
 	initializeSex( "A" ); // etc: spaces for ease of editing with line.split
 }
 
 
-//burn in
+// No burn in for neutral model.  Recapitation (with recombination map) will suffice.
 1 early() {
 	defineConstant("simnum", getSeed());
 	setSeed(getSeed() + 27126);
@@ -55,23 +38,22 @@ initialize() {
 	sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
 }
 
-10000 { // after burn-in, split populations into two: p1 and p2
+2 { // after initial generation from which we will recapitate, split populations into two: p1 and p2
 	sim.addSubpopSplit("p2", asInteger(10000/n), p1);
 }
-10000 late() {
+2 late() {
 	sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
 }
 
-10010 late() {
+12 late() {  // Keeping with original, AI emerges 100/n_scale generations after p1/p2 split.
 	if(m4s != 0.0){  // We introduce an adaptive variant.
 		target = sample(p1.genomes, 1);
 		target.addNewDrawnMutation(m4, 2500000 ); // TODO: change to insert_ai
-
 		// etc: critical change here from .outputFull to .treeSeqOutput
 		sim.treeSeqOutput("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/tmp/" + simnum + ".txt");
 	}
 }
-10010: late() {
+12: late() {
 	if(m4s != 0.0){  // We check in on our adaptive variant.
 		mut = sim.mutationsOfType(m4);
 		if (size(mut) == 1) {
@@ -89,24 +71,24 @@ initialize() {
 	}
 }
 
-11000 {
+1000 {
 	sim.addSubpopSplit("p3", asInteger(1000/n), p2);
 }
-11000 late() {
+1000 late() {
 	sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
 }
 
-12000 early(){
+2000 early(){
 	sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
 	p1.setMigrationRates(p3, 0.00); //migration rate INTO p1
 	p3.setMigrationRates(p1, 0.1); //migration rate INTO p3
 }
-12000 late(){
+2000 late(){
 	sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
 	p3.setMigrationRates(p1, 0.00);
 	p1.setMigrationRates(p3, 0.00);
 }
 
-13000 late(){
+3000 late(){
 	sim.treeSeqOutput("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/trees/sgcb_m0_sexA.trees");
 }

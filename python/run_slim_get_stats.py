@@ -23,9 +23,11 @@ adaptive introgression summary statistics in non-overlapping 50kb windows
 @author: xinjunzhang
 """
 
-import pyslim, os, random, itertools,argparse,glob,matplotlib.pyplot
+import pyslim, os, random, argparse
 import numpy as np
 from multiprocessing import Manager, Pool
+
+import tree_tools as tt  # etc
 
 
 parser = argparse.ArgumentParser(description="A script for running slim and computing summary statistics in 50kb windows across a given chromosome")
@@ -66,132 +68,40 @@ num_reps = int(args.numrep_id)
 
 #sample command: python3 run_slim_get_stats.py -g 1 -h 0 -m 1 -p 4 -d 0 -n 10 -s 1 -r 200
 
+# No earthly idea why this is implemented like this.
+# TODO: scrap the file i/o but keep the digitization
+def calc_ancestry_window (ancestry_fracs, intervals, num_windows=100, len_genome=None):
 
-def calc_p1ancestry (treepath, admpop, popsize,t_sinceadm,model):
-    ts = pyslim.load(treepath)
-    any_ancestry = ancestry_p_varies(ts,admpop,popsize,t_sinceadm,model)
-    meanp1 = sum(any_ancestry)/len(any_ancestry)
-    return meanp1
+    start_positions = np.asarray([i[0] for i in intervals])
+    end_positions = np.asarray([i[1] for i in intervals])
+    interval_spans = end_positions - start_positions
 
-def ancestry_p_varies(ts,pop,nsize,duration,model): #pop=source pop
-    nhaps=nsize*2  # TODO: etc: I changed var name
-    mixtime=duration
-    source_haps = [x.id for x in ts.nodes() if ((x.population == int(pop)) and (x.time == mixtime))] #source pop # TODO: etc: I changed var name
-    if model ==1:
-        today = [x.id for x in ts.nodes() if ((x.population == 4) and (x.time == 0))] #assuming p4 is recipient
-    elif model ==0:
-        today = [x.id for x in ts.nodes() if ((x.population == 3) and (x.time == 0))]
+    # TODO: actually fix the window size hardcoding
+    if len_genome is None:  # just figure it out from intervals
+        len_genome = max(end_positions)
+    allpos_bin = np.linspace(0,len_genome, num_windows) #windows of every 50kb
+    endpos_digitized = np.digitize(end_positions, allpos_bin)
 
-    tree_p = [sum([t.num_tracked_samples(u) for u in source_haps])/nhaps
-               for t in ts.trees(tracked_samples=today, sample_counts=True)]
-    # TODO: etc: in my small sim at least this is all zero all the time
-    return tree_p
+    ancestry_fracs = np.asarray(ancestry_fracs)
+    anc_frac_by_window = []
+    anc_windows = []
+    for w in range(1, num_windows):
+        window_mask = endpos_digitized==w
+        if np.any(window_mask):
+            window_start = min(start_positions[window_mask])
+            window_end = max(end_positions[window_mask])
+            anc_windows.append((window_start, window_end))
 
-def ancestry_local (treepath):
-    starts, ends, subpops = [], [], []
-    ts = pyslim.load(treepath)
-    for tree in ts.trees(sample_counts=True):
-        subpop_sum, subpop_weights = 0, 0
-        for root in tree.roots:
-            leaves_count = tree.num_samples(root) - 1
-            subpop_sum += tree.population(root) * leaves_count
-            subpop_weights += leaves_count
-        starts.append(tree.interval[0])
-        ends.append(tree.interval[1])
-        subpops.append(subpop_sum / float(subpop_weights))
+            these_spans = interval_spans[window_mask]
+            these_anc = ancestry_fracs[window_mask]
 
-    x = [x for pair in zip(starts, ends) for x in pair]
-    y = [x for x in subpops for _ in (0, 1)]
-    matplotlib.pyplot.plot(x, y)
-    matplotlib.pyplot.show()
-    return x,y #x=genome positions; y = ancestry
+            anc_frac_by_window.append(np.average(these_anc, weights=these_spans))
+        else:
+            anc_windows.append((float('nan'), float('nan')))
+            anc_frac_by_window.append(float('nan'))
 
-def ancestry_position_writeout (treepath,n,admpop,popsize,t_sinceadm,region_name):
-    ts = pyslim.load(treepath)
-    starts=[]
-    ends=[]
+    return anc_frac_by_window, anc_windows
 
-    for x in ts.trees():
-        starts.append(x.interval[0])
-        ends.append(x.interval[1])
-
-    outfilename = DIR_anc+ region_name+str(dominance)+ "_"+str(model)+ "_"+str(growth)+ "_"+str(m4s)+ "_"+str(hs) + "_"+str(n) + '.ancestry'
-    outfile = open(outfilename, 'w')
-    outfile.write('start,end,ancestry\n')
-
-    p1ancestry = ancestry_p_varies(ts,admpop,popsize,t_sinceadm, model)  #TODO: etc I did this
-
-    for start, end, anc in zip(starts, ends, p1ancestry):
-        outfile.write('{0},{1},{2}\n'.format(start, end, anc))
-
-    outfile.close()
-
-def write_ancestry (DIR_tree, output_anc_file):
-    tree_all = glob.glob(DIR_tree+'*.trees')
-    with open(output_anc_file, 'w') as outfile:
-        for file in tree_all:
-            x,y = ancestry_local (file)
-
-            for item in x:
-                outfile.write("%s\t" % item)
-            outfile.write("\n")
-            for item in y:
-                outfile.write("%s\t" % item)
-            outfile.write("\n")
-
-
-def load_data_slim(file_path,len_genome,adm_gen,end_gen): # load slim's output
-# TODO: etc: why does freqp4_b/a just get overridden a bunch?.. It's zero'd out later ln. 184ish
-    pos_den, hapMat_den,freqp4_before,freqp4_after = get_pos_hap(file_path,'p1',len_genome,end_gen)
-    pos_afr, hapMat_afr,freqp4_before,freqp4_after = get_pos_hap(file_path,'p2',len_genome,end_gen)
-    pos_nonafr, hapMat_nonafr,freqp4_before,freqp4_after = get_pos_hap(file_path,'p3',len_genome,end_gen)
-    pos_preadm, hapMat_preadm,freqp4_before,freqp4_after = get_pos_hap(file_path,'p3',len_genome,adm_gen)
-
-    # TODO: etc: just really wrong....?
-    # pos_den, hapMat_den,freqp4_before,freqp4_after = get_pos_hap(file_path,'p2',len_genome,end_gen)
-    # pos_afr, hapMat_afr,freqp4_before,freqp4_after = get_pos_hap(file_path,'p1',len_genome,end_gen)
-    # pos_nonafr, hapMat_nonafr,freqp4_before,freqp4_after = get_pos_hap(file_path,'p4',len_genome,end_gen)
-    # pos_preadm, hapMat_preadm,freqp4_before,freqp4_after = get_pos_hap(file_path,'p2',len_genome,adm_gen)
-
-    return pos_den, hapMat_den,pos_afr, hapMat_afr,pos_nonafr, hapMat_nonafr,pos_preadm, hapMat_preadm,freqp4_before,freqp4_after
-
-
-def get_pos_hap(file_path,pop_id,len_genome,gen_time): #get pos and hapMat for a given pop from slim output
-# etc: no! not in slim output for mod0 code
-#   #OUT and SM header not in the output file when filepath is provided.  see manual 25.2.2
-#   The first line is a header in the same format as for outputSample(), as described in the previous section. The output type code here, SM, represents “sample, MS format”. The outputMSSample() method allows output to be sent to a file, with the optional filePath argument. In this case, the #OUT: header line is not emitted, since it would not be conformant with the MS data format specification.
-    infile = open(file_path,'r')
-    end=0
-    while end==0:
-        line = infile.readline()
-        if line[0:5]=='#OUT:': #output lines  # TODO: etc: lol no lines are marked #OUT:
-            fields = line.split()
-            out_type = fields[2]
-            pop = fields[3]
-            gen = fields[1]
-            if out_type=='SM' and pop==pop_id and int(gen) == gen_time: #ms lines
-                num_indiv = int(fields[4])
-                infile.readline() #skip //
-                infile.readline() #skip segsites
-                pos = (np.array(infile.readline().split()[1:]).astype(float) * len_genome).astype(int)
-                mult_mut_pos = find_mult_mut_pos(pos)+1
-                pos = np.delete(pos,mult_mut_pos)
-                hapMat = np.zeros((num_indiv,len(pos)),dtype=int)
-                for indiv in range(0,num_indiv):
-                    hap = np.array(list(infile.readline())[:-1]).astype(int)
-                    hap = np.delete(hap,mult_mut_pos)
-                    hapMat[indiv] = hap
-                freqp4_before = 0  # why is this just zero'd?  also overwritten in load_data_slim.. but then output??
-                freqp4_after = 0
-                end=1
-    infile.close()
-    return pos, hapMat,freqp4_before,freqp4_after
-
-
-def find_mult_mut_pos(pos): #find repeating mutations and remove them
-    dist = np.array([pos[i+1]-pos[i] for i in range(0,len(pos)-1)])
-    mult_mut_pos = np.where(dist==0)[0]
-    return mult_mut_pos
 
 def find_ai_site (segfile): #find an exon in the mid-range of the segment to insert AI mutation
     segs = open(segfile)
@@ -212,15 +122,7 @@ def find_ai_site (segfile): #find an exon in the mid-range of the segment to ins
     return window_start,window_end #return exon start and end position
 
 
-def insert_anc_alleles (allpos,pos,hap):
-    for site in allpos:
-        if site not in pos:
-            insertidx = np.searchsorted(pos,site)
-            pos = np.insert(pos,insertidx,site)
-            hap = np.insert(hap, insertidx, 0, axis=1)
-    return pos, hap
-
-def etc_insert_anc_alleles(allpos, pos, haps):
+def insert_anc_alleles(allpos, pos, haps):
     new_haps = np.zeros((haps.shape[0], allpos.size))
     insertidc = np.isin(allpos, pos)
     new_haps[:, insertidc] = haps
@@ -231,40 +133,23 @@ def calc_derived_freq (pop_hap):
     popfreq = popfreq/ float(pop_hap.shape[0])
     return popfreq
 
-def vSumFunc(other_hap, currentArchi,p1_hapw):
-    current_hap = np.array([p1_hapw[currentArchi,]])
-    div = np.zeros(other_hap.shape)
-    ones = np.ones((other_hap.shape[0],1))
-    current_hap = current_hap
-    current_hap_extended = np.dot(ones, current_hap)
-    div = np.logical_xor(current_hap_extended == 1, other_hap == 1)
-    return np.add.reduce(div, 1)
-
-def calc_stats (file_path,len_genome,adm_gen,end_gen):
-    pos_den, hapMat_den,pos_afr, hapMat_afr,pos_nonafr, hapMat_nonafr,pos_preadm, hapMat_preadm,freqp4_before,freqp4_after = load_data_slim(file_path,len_genome,adm_gen,end_gen)
-
-    p1_pos = pos_den
-    p2_pos = pos_afr
-    p3_pos = pos_nonafr
-    p1_hap = hapMat_den
-    p2_hap = hapMat_afr
-    p3_hap = hapMat_nonafr
-
-    all_pos = np.unique(np.concatenate((p1_pos,p2_pos,p3_pos)))
-
-#TODO: etc: FYI these are slow
-# this is insane afaict
-# pn_pos is just the same as all_pos
-# pn_hap can be calculated in a far faster manner I think.
-    p1_pos,p1_hap = etc_insert_anc_alleles(all_pos,p1_pos,p1_hap)
-    p2_pos,p2_hap = etc_insert_anc_alleles(all_pos,p2_pos,p2_hap)
-    p3_pos,p3_hap = etc_insert_anc_alleles(all_pos,p3_pos,p3_hap)
+## Keep for divratio re-implementation
+# def vSumFunc(other_hap, currentArchi,p1_hapw):
+#     current_hap = np.array([p1_hapw[currentArchi,]])
+#     div = np.zeros(other_hap.shape)
+#     ones = np.ones((other_hap.shape[0],1))
+#     current_hap = current_hap
+#     current_hap_extended = np.dot(ones, current_hap)
+#     div = np.logical_xor(current_hap_extended == 1, other_hap == 1)
+#     return np.add.reduce(div, 1)
 
 
-    allpos_bin = np.linspace(0,len_genome,int(len_genome/50000)) #windows of every 50kb
+def calc_stats (ts, sample_size, num_windows=100):
+    (p1_hap, p2_hap, p3_hap), all_pos = tt.sample_population_haplotypes(ts, n_haps=int(sample_size), check_loc=insert_ai)
 
+    len_genome = ts.sequence_length
+    allpos_bin = np.linspace(0,len_genome,num_windows) #windows of every 50kb
     allpos_digitized = np.digitize(all_pos, allpos_bin)
-
 
     Dstat_list = []
     fD_list = []
@@ -282,7 +167,7 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
     pos_end = []
 
 
-    for w in range(1,100):  # etc: hardcoded here, but above was int(len_genome/50000)
+    for w in range(1,num_windows):  # etc: hardcoded here, but above was int(len_genome/50000)
         these_pos = all_pos[allpos_digitized==w]
 
         if len(these_pos)>1:
@@ -294,7 +179,7 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
             p2_hapw = p2_hap[:,these_pos_idx]
             p3_hapw = p3_hap[:,these_pos_idx]
 
-            p1_freqw = calc_derived_freq (p1_hapw)
+            p1_freqw = calc_derived_freq (p1_hapw)  # why is this called "derived"? It's just a w/in pop'n allele freq
             p2_freqw = calc_derived_freq (p2_hapw)
             p3_freqw = calc_derived_freq (p3_hapw)
 
@@ -331,7 +216,7 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
             Het = np.sum(hetvec) /50000  # etc: again, hardcoded window length
             Het_list.append(Het)
 
-
+            # TODO: Re-implement this
             # divratio = []
             # # for archi in range(p1_hapw.shape[0]): #iterate over 0-99 haps; 100 total)
             # for archi in range(0, 3): # TODO: etc: put this back.  just smaller for testing p1_hapw.shape[0]): #iterate over 0-99 haps; 100 total
@@ -393,77 +278,92 @@ def calc_stats (file_path,len_genome,adm_gen,end_gen):
             U_1_80_100_list.append(float('nan'))
 
 
-    return pos_start,pos_end,freqp4_before,freqp4_after,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list
+    return pos_start, pos_end, Dstat_list, fD_list, Het_list, divratioavg_list, Q_1_100_q95_list, Q_1_100_q90_list, Q_1_100_max_list, U_1_0_100_list, U_1_20_100_list, U_1_50_100_list, U_1_80_100_list
 
-def update_par_file(region_name,temp_par, new_par,model,growth,dominance,nscale,m4s,hs,insert_ai, sex):
+
+def update_par_file(temp_par, new_par, model, growth, dominance,
+                    nscale, m4s, hs, insert_ai, sex, trees_filename, region_filename):
+
     oldfile = open(temp_par)
     newfile = open(new_par,'w')
     line_counter=0
     for line_counter, line in enumerate(oldfile):
         fields = line.split()
 
-        if model ==0: # etc: only implementing sex in m0 rn
-            if line_counter==1:
-                fields[1] = str(dominance)+");"
-            elif line_counter==2:
-                fields[1] = str(nscale)+");"
-            elif line_counter==3:
-                fields[1] = str(m4s)+"*n);"
-            elif line_counter==15:
-                fields[2] = 'readFile("' + dir_stem + 'regions/sim_seq_info_'+str(region_name)+'.txt");'
-            if sex is None:
-                if line_counter==50:
-                    fields[0] = str(int(100000/nscale))
-                elif line_counter==60:
-                    fields[0] = str(int(100100/nscale))
-                elif line_counter==68:
-                    fields[0] = str(int(100100/nscale))+":"
-                elif line_counter==85:
-                    fields[0] = str(int(110000/nscale))
-                elif line_counter==87:
-                    fields[0] = str(int(110000/nscale))
-                elif line_counter==92:
-                    fields[0] = str(int(119950/nscale))
-                elif line_counter==96:
-                    fields[0] = str(int(120000/nscale -1))
-                elif line_counter==105:
-                    fields[0] = str(int(120000/nscale))
-                elif line_counter==110:
-                    fields[0] = str(int(120000/nscale +1))
-                elif line_counter==118:
-                    fields[0] = str(int(130000/nscale))
-                elif line_counter==122:
-                    fields[0] = 'sim.treeSeqOutput("' + dir_stem + 'output/trees/'+str(region_name)+'_m0_sex'+str(sex)+'.trees");'
-            elif sex is not None:
-                if line_counter == 38:  # etc. here comes initializeSex
-                    fields[1] = '"' + str(sex) + '"'
-                elif line_counter==50:
-                    fields[0] = str(int(100000/nscale))
-                elif line_counter==60:
-                    fields[0] = str(int(100100/nscale))
-                elif line_counter==68:
-                    fields[0] = str(int(100100/nscale))+":"
-                elif line_counter==85:
-                    fields[0] = str(int(110000/nscale))
-                elif line_counter==87:
-                    fields[0] = str(int(110000/nscale))
-                elif line_counter==92:
-                    fields[0] = str(int(119950/nscale))
-                elif line_counter==96:
-                    fields[0] = str(int(120000/nscale -1))
-                elif line_counter==105:
-                    fields[0] = str(int(120000/nscale))
-                elif line_counter==110:
-                    fields[0] = str(int(120000/nscale +1))
-                elif line_counter==118:
-                    fields[0] = str(int(130000/nscale))
-                elif line_counter==122:
-                    fields[0] = 'sim.treeSeqOutput("' + dir_stem + 'output/trees/'+str(region_name)+'_m0_sex'+str(sex)+'.trees");'
+        if model == 0: # etc: only implementing m0 rn
+        # TODO: include hs?
+        # TODO: calculate timepoints using adm_gen and end_gen??
+            if line_counter == 1:
+                fields[1] = str(dominance)  # irrelevant in neutral model
+            elif line_counter == 2:
+                fields[1] = str(nscale)
+            elif line_counter == 3:
+                fields[1] = str(m4s)
+            if m4s == 2:  # neutral model
+                if line_counter == 15:  # region info file
+                    fields[2] = 'readFile("' + region_filename + '");'
+                elif line_counter == 29:  # initializeSex
+                    if sex is None:  # comment out the call
+                        fields[0] = '// ' + fields[0]
+                    else:  # initializeSex as autosome or Xchr ("A" or "X")
+                        fields[1] = '"' + str(sex) + '"'
+                elif line_counter == 40:  # p1/p2 split
+                    fields[0] = str(int(2))
+                elif line_counter == 43:  # remember p1/p2 split
+                    fields[0] = str(int(2))
+                elif line_counter == 47:  # AI variant emerges
+                    fields[0] = str(int(100/nscale + 2))
+                elif line_counter == 50:  # locus for AI variant
+                    fields[1] = str(int(insert_ai))
+                elif line_counter == 55:  # loop to check on AI variant
+                    fields[0] = str(int(100/nscale + 2)) + ":"
+                elif line_counter == 68:  # locus for AI variant in loop
+                    fields[1] = str(int(insert_ai))
+                elif line_counter == 73:  # p2/p3 split
+                    fields[0] = str(int(10000/nscale))
+                elif line_counter == 76:  # remember p2/p3 split
+                    fields[0] = str(int(10000/nscale))
+                elif line_counter == 80:  # admixture generation early()
+                    fields[0] = str(int(20000/nscale))  # TODO: replace by adm_gen
+                elif line_counter == 85:  # admixture generation late()
+                    fields[0] = str(int(20000/nscale)) # TODO: replace by adm_gen
+                elif line_counter == 91:  # final generation
+                    fields[0] = str(int(30000/nscale))  # TODO: replace by end_gen
+                elif line_counter == 92:  # write out .trees
+                    fields[0] = 'sim.treeSeqOutput("' + trees_filename + '");'
 
-            new_line=str()
-            for item in fields:
-                new_line = new_line+item+" "
-            newfile.write(new_line+'\n')
+            elif m4s != 2:   # recessive deleterious "negative" background model
+                if line_counter == 23:  # region info file
+                    fields[2] = 'readFile("' + region_filename + '");'
+                elif line_counter == 45:  # initializeSex
+                    if sex is None:  # comment out the call
+                        fields[0] = '// ' + fields[0]
+                    else:  # initializeSex as autosome or Xchr ("A" or "X")
+                        fields[1] = '"' + str(sex) + '"'
+                elif line_counter == 57:  # p1/p2 split
+                    fields[0] = str(int(100000/nscale))
+                elif line_counter == 60:  # remember p1/p2 split
+                    fields[0] = str(int(100000/nscale))
+                elif line_counter == 64:  # AI variant emerges
+                    fields[0] = str(int(100/nscale) + int(100000/nscale))
+                elif line_counter == 67:  # locus for AI variant
+                    fields[1] = str(int(insert_ai))
+                elif line_counter == 73:  # loop to check on AI variant
+                    fields[0] = str(int(100/nscale) + int(100000/nscale))+":"
+                elif line_counter == 86:  # locus for AI variant in loop
+                    fields[1] = str(int(insert_ai))
+                elif line_counter == 91:  # p2/p3 split
+                    fields[0] = str(int(110000/nscale))
+                elif line_counter == 94:  # remember p2/p3 split
+                    fields[0] = str(int(110000/nscale))
+                elif line_counter == 98:  # admixture generation early()
+                    fields[0] = str(int(120000/nscale))  # TODO: replace by adm_gen
+                elif line_counter == 103:  # admixture generation late()
+                    fields[0] = str(int(120000/nscale))  # TODO: replace by adm_gen
+                elif line_counter == 109:  # final generation
+                    fields[0] = str(int(130000/nscale))  # TODO: replace by end_gen
+                elif line_counter == 110:  # write out .trees
+                    fields[0] = 'sim.treeSeqOutput("' + trees_filename + '");'
 
         elif model ==1:   #modelh
             if line_counter==1:
@@ -477,7 +377,7 @@ def update_par_file(region_name,temp_par, new_par,model,growth,dominance,nscale,
             elif line_counter==5:
                 fields[1] = str(m4s)+"*n);"
             elif line_counter==23:
-                fields[2] = 'readFile("' + dir_stem + 'regions/sim_seq_info_'+str(region_name)+'.txt");'
+                fields[2] = 'readFile("' + region_filename + '");'
             elif line_counter==77:
                 fields[0] = "1:"+str(int(89000/nscale))
             elif line_counter==90:
@@ -505,68 +405,37 @@ def update_par_file(region_name,temp_par, new_par,model,growth,dominance,nscale,
             elif line_counter==183:
                 fields[0] = str(int(89000/nscale))
             elif line_counter==187:
-                fields[0] = 'sim.treeSeqOutput("' + dir_stem + 'output/tree/'+str(region_name)+'_mh.trees");'
+                fields[0] = 'sim.treeSeqOutput("' + trees_filename + '");'
 
-            new_line=str()
-            for item in fields:
-                new_line = new_line+item+" "
-            newfile.write(new_line+'\n')
-
+        new_line=str()
+        for item in fields:
+            new_line = new_line+item+" "
+        newfile.write(new_line+'\n')
 
     newfile.close()
     oldfile.close()
 
 
-def calc_ancestry_window (ancestry_file,len_genome):
-    infile = open(ancestry_file,'r')
-    end_pos = []
-    ancestry = []
-    line_counter=0
-    for line_counter, line in enumerate(infile):
-        fields = line.split(',')
-        if fields[0] != "start":
-            end_pos.append(float(fields[1]))
-            ancestry.append(float(fields[2]))
-    infile.close()
-    allpos_bin = np.linspace(0,len_genome,int(len_genome/50000)) #windows of every 50kb
-
-    endpos_digitized = np.digitize(end_pos, allpos_bin)
-    end_pos = np.array(end_pos)
-    ancestry = np.array(ancestry)
-
-    anc_window = []
-    anc_pos = []
-
-    for w in range(1,100):
-        these_pos = end_pos[endpos_digitized==w]
-        these_anc = ancestry[endpos_digitized==w]
-
-        if(len(these_pos))>0:
-            anc_window.append(np.mean(these_anc))
-            anc_pos.append(these_pos)
-        else:
-            anc_window.append(float('nan'))
-            anc_pos.append(these_pos)
-
-    return anc_window
-
-
 
 def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex):
 
+    # set filenames
     region_name = region_all[r]
-    segsize=5000000
+    region_info_filename = dir_stem + 'regions/sim_seq_info_' + str(region_name) + '.txt'
+    trees_filename = dir_stem + 'output/trees/'+str(region_name)+'_m'+str(model)+'_sex'+str(sex)+'.trees'
+    new_par = DIR_par +"par_"+region_name+str(dominance)+str(model)+ str(sex)+str(n)+".txt"
 
-    if model ==1:
+# etc: why were these vales not used in writing par files????
+# TODO: send these to update_par_file
+    if model ==1:  # etc: not handling this model yet
         if dominance != 2:
             temp_par = dir_stem + "slim/modelh_neg.txt"
         elif dominance == 2:
             temp_par = dir_stem + "slim/modelh_neu.txt"
         adm_gen = (87400-1)/nscale
         end_gen = 89000/nscale
-        t_end = 1600/nscale -1
-        popsize=41080/nscale #recipient population size at the end of simulation
-
+        # t_end = 1600/nscale -1
+        popsize=41080/nscale # recipient population size at the end of simulation
         if growth ==1:
             popsize = 550/nscale
         elif growth ==2:
@@ -575,77 +444,83 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
             popsize = 7300/nscale
         elif growth ==4:
             popsize = 41080/nscale
+        source_popn = 2  # etc: not sure
+        recip_popn = 4  # etc: not sure
 
-    elif model==0:
-        # etc: implementing sex only for model0 rn
-        if sex is not None:
-            if dominance !=2:
-                temp_par = dir_stem + "slim/model0_neg_sex_nonexon.slim"  # etc: fixed script
-            elif dominance == 2:
-                temp_par = dir_stem + "slim/model0_neu_sex.slim"  # TODO: etc: write
-        else:
-            if dominance !=2:
-                temp_par = dir_stem + "slim/model0_neg_nonexon.slim"  # etc: fixed script
-            elif dominance == 2:
-                temp_par = dir_stem + "slim/model0_neu.slim"  # etc: fixed script
+    elif model == 0:
+        if dominance !=2:
+            temp_par = dir_stem + "slim/ts_model0_neg.slim"
+            adm_gen = 120000/nscale
+            end_gen = 130000/nscale
+        elif dominance == 2:
+            temp_par = dir_stem + "slim/ts_model0_neu.slim"
+            # recap'ing obviates need for 10k of SLiM burn-in in neutral model
+            adm_gen = 20000/nscale
+            end_gen = 30000/nscale
+        popsize = 1000 / nscale  # extant size of p3 (as split off from p2 in mod0)
+        source_popn = 1
+        recip_popn = 3
 
-        adm_gen = 120000/nscale - 1
-        end_gen = 130000/nscale
-        t_end = 10000/nscale  # etc: this means time from admixture to end of simulation (present)
-        popsize=1000/nscale
+    # segsize = 5000000  # nice that this is here, but hardcoded everywhere else
+    adm_gens_ago = end_gen - adm_gen
 
-    new_par = DIR_par +"par_"+region_name+str(dominance)+str(model)+ str(sex)+str(n)+".txt"
+    update_par_file(temp_par, new_par, model, growth, dominance,
+                    nscale, m4s, hs, insert_ai, sex, trees_filename+'.orig',
+                    region_info_filename)
 
-    update_par_file(region_name,temp_par, new_par,model,growth,dominance,nscale,m4s,hs,insert_ai, sex)
+    # this is the slim output file in MS format (0x and 1s for haplotypes)
+    # TODO: Move away from writing/reading these.
+    # See below to extract from ts after throwing neutrals?
+    # https://tskit.readthedocs.io/en/latest/python-api.html#tskit.TreeSequence.haplotypes !!!!
+    # https://tskit.readthedocs.io/en/latest/python-api.html#tskit.TreeSequence.variants
+    slim_output = DIR_out +'OUT_'+region_name+str(sex)+str(m4s)+ str(n)+".txt"
 
-    slim_output = DIR_out +'OUT_'+region_name+str(sex)+str(m4s)+ str(n)+".txt"  #TODO: etc: this is the slim output file where nothing has the line #OUT:
+    # Run the SLiM simulation!
+    os.system('slim %s > %s' %(new_par, slim_output))
 
-    os.system('slim %s > %s' %(new_par ,slim_output))
+    # Overlay neutral mutations onto TreeSequence
+    # TODO: variable-ize initial_Ne (size of p1 at beginning of sim)
+    ts = tt.throw_neutral_muts(trees_filename+'.orig', region_info_filename,
+                           neu_or_neg=dominance, n_scale=nscale)
 
-    # treepath = DIR_tree+str(region_name)+str(dominance)+'.trees'  etc: had to change to match ln 416/463
-    if model==1:
-        treepath = DIR_tree + str(region_name) + '_mh.trees'
-        meanp1 = calc_p1ancestry(treepath,2,popsize,t_end,model)
-        ancestry_position_writeout(treepath,n,2,popsize,t_end,region_name, sex) #write out ancestry info
-    elif model==0:
-        treepath = DIR_tree + str(region_name)+'_m0_sex'+str(sex)+'.trees'  # etc
-        # treepath = DIR_tree + str(region_name) + '_m0.trees'
-        meanp1 = calc_p1ancestry(treepath,1,popsize,t_end,model)   #TODO: etc.  here is issue with 'n'.  just debugging?
-        ancestry_position_writeout(treepath,n,1,popsize,t_end,region_name)
+    # Calculate how much source ancestry is present in today's recipient popn
+    mean_source_anc, source_anc_fracs, intervals = tt.calc_ancestry_frac_over_region(ts, source_popn, recip_popn, adm_gens_ago)
+        # Mean ancestry per 50kb window
+    anc_by_window, anc_windows = calc_ancestry_window(source_anc_fracs, intervals)
 
+    # Calculate other statistics from genotype matrices
+    pos_start,pos_end,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list = calc_stats(ts, sample_size=popsize)
 
-    pos_start,pos_end,freqp4_before,freqp4_after,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list = calc_stats(slim_output,segsize,adm_gen,end_gen)
-
-    # TODO: etc: well good thing this is exactly the same as ln 118........ :O
-    ancestry_file = DIR_anc+ region_name+str(dominance)+ "_"+str(model)+ "_"+str(growth)+ "_"+str(m4s)+ "_"+str(hs) + "_"+str(n) + '.ancestry'
-    anc_window = calc_ancestry_window (ancestry_file,segsize) #get mean ancestry per 50kb window
-
-    q.put([n,insert_ai,growth,meanp1,pos_start,pos_end,freqp4_before,freqp4_after,anc_window, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
+    q.put([n,insert_ai,growth,mean_source_anc,anc_windows, anc_by_window, pos_start,pos_end, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
     #other parameter info are stored in the output file name
 
-    # os.system('rm '+slim_output)
+    os.system('rm '+slim_output)
     # os.system('rm '+treepath)
     # os.system('rm '+new_par)
-    # os.system('rm '+ancestry_file)
 
 
-
-def write_to_file(windowfile_name,q):
-    windowfile = open(windowfile_name,'w')
-
-    while 1:
+def write_to_file(windowfile_name, q):
+    windowfile = open(windowfile_name, 'w')
+    while 1:  # etc: terrifying
         q_elem = q.get()
-
         if q_elem=='kill': # break if end of queue
             print ('END OF SIMULATIONS')
             break
-
-        [n,insert_ai,growth,meanp1,pos_start,pos_end,freqp4_before,freqp4_after,anc_window,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list] = q_elem
+        print(len(q_elem))
+        [n,insert_ai,growth,mean_source_anc,anc_windows, anc_by_window,pos_start,pos_end,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list] = q_elem
         for i in range(len(Dstat_list)):
-            windowfile.write("%d\t%d\t%d\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n" % (n,insert_ai,growth,meanp1,pos_start[i],pos_end[i],freqp4_before,freqp4_after,anc_window[i],Dstat_list[i], fD_list[i], Het_list[i], divratioavg_list[i],Q_1_100_q95_list[i],Q_1_100_q90_list[i],Q_1_100_max_list[i],U_1_0_100_list[i],U_1_20_100_list[i],U_1_50_100_list[i],U_1_80_100_list[i]))
-
+            format_string = "%d\t%d\t%d\t%f\t%d\t%d\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n"
+            items_to_write = (n,insert_ai,growth,mean_source_anc,anc_windows[i][0], anc_windows[i][1], anc_by_window[i],pos_start[i],pos_end[i],Dstat_list[i], fD_list[i], Het_list[i], divratioavg_list[i],Q_1_100_q95_list[i],Q_1_100_q90_list[i],Q_1_100_max_list[i],U_1_0_100_list[i],U_1_20_100_list[i],U_1_50_100_list[i],U_1_80_100_list[i])
+            if i == 0:  # first line for each replicate
+                # Check that each item has a formatted location to go into
+                assert format_string.count('%') == len(items_to_write)
+            # formatting check for ancestry windows... might just want to
+            # plot ancestry separately with the finer tree intervals and skip
+            # weirdly forcing it to 50k windows different to stats' windows
+            if np.isnan(anc_windows[i][0]):
+                format_string = "%d\t%d\t%d\t%f\t%f\t%f\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n"
+            windowfile.write(format_string % items_to_write)
         windowfile.flush()
-
     windowfile.close()
 
 
@@ -659,7 +534,7 @@ if __name__=='__main__':
     #growth = 4
     #hs = 0 #0 = recessive or neutral; 1 = hs relationship
     dominance = 0 #if 0, run the deleterious recessive model #if 2, run the neutral model
-    nscale = 10 #define scaling factor
+    nscale = 100 #define scaling factor
     m4s = 0.01 #adaptive selection strength
     num_reps=1 #number of simulations per region
     region_all = ["chr11max","chr19region","chr3region","galnt18","hla","hyal2",
@@ -670,7 +545,6 @@ if __name__=='__main__':
     dir_stem = "/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/"
 
     DIR_region = dir_stem + "regions/"
-    DIR_anc = dir_stem + "output/ancestry/"
     DIR_out = dir_stem + "output/out/"
     DIR_tree = dir_stem + "output/trees/"
     DIR_par = dir_stem + "slim/"
@@ -678,13 +552,16 @@ if __name__=='__main__':
     # or loop over genes here I suppose
     r = int(whichgene-1)
 
-
     region_name = region_all[r]
 
-    window_start,window_end=find_ai_site (DIR_region+"sim_seq_info_"+str(region_name)+".txt")
-    insert_ai = int((int(window_end)+int(window_start))/2) #find the position to insert AI mutation
+    # Find an exon in the middle-ish of the region...
+    window_start, window_end = find_ai_site(DIR_region+"sim_seq_info_"+str(region_name)+".txt")
+    # ...and put the AI variant in the middle of that exon.
+    insert_ai = int((int(window_end)+int(window_start))/2)
+
     attempt_num = np.random.randint(5000)
-    windowfile_name = dir_stem + "output/stats/20200630/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'attempt' + str(attempt_num) + '_human_windows.txt'
+    print(attempt_num)
+    windowfile_name = dir_stem + "output/stats/20200709/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'-attempt' + str(attempt_num) + '_human_windows.txt'
     num_proc = 10
     manager = Manager()
     pool = Pool(processes=num_proc)
@@ -701,5 +578,9 @@ if __name__=='__main__':
     pool.close()
     pool.join()
 
+    # # peek at first line of stats file to check in on things
+    # with open(windowfile_name, 'r') as f:
+    #     print("First line of stats file for this run is below.")
+    #     print(f.readline())
 
     print("END OF SIMULATION")

@@ -15,3 +15,5 @@ slim/tmp.out
 .RData
 
 *.tmp
+
+python/__pycache__/tree_tools.cpython-37.pyc
