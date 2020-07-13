@@ -494,7 +494,7 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
     q.put([n,insert_ai,growth,mean_source_anc,anc_windows, anc_by_window, pos_start,pos_end, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
     #other parameter info are stored in the output file name
 
-    # os.system('rm '+slim_output)
+    os.system('rm '+slim_output)
     # os.system('rm '+treepath)
     # os.system('rm '+new_par)
 
@@ -514,6 +514,9 @@ def write_to_file(windowfile_name, q):
             if i == 0:  # first line for each replicate
                 # Check that each item has a formatted location to go into
                 assert format_string.count('%') == len(items_to_write)
+            # formatting check for ancestry windows... might just want to
+            # plot ancestry separately with the finer tree intervals and skip
+            # weirdly forcing it to 50k windows different to stats' windows
             if np.isnan(anc_windows[i][0]):
                 format_string = "%d\t%d\t%d\t%f\t%f\t%f\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n"
             windowfile.write(format_string % items_to_write)
