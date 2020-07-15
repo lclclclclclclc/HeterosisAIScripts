@@ -37,7 +37,7 @@ def throw_neutral_muts(tree_file, region_info_file, neu_or_neg=0,
     Output
     ------
     Writes out .trees file, recapitated, with neutral mutations overlayed.
-    Currently OVERWRITES the original .trees file
+    Currently OVERWRITES the original .trees file UNLESS the original has ext '.orig'
 
     Returns
     ------
@@ -98,7 +98,9 @@ def throw_neutral_muts(tree_file, region_info_file, neu_or_neg=0,
         mut_rate *= 1 / (1 + 2.31)  # will under-mutate non-exons
 
     ts = pyslim.SlimTreeSequence(msprime.mutate(recap_ts, rate=mut_rate, keep=True))
-    # TODO: Consider not overwritting original file
+    # check that we've correctly recap'd
+    assert max([t.num_roots for t in ts.trees()]) == 1
+
     # default is still to overwrite...
     out_name = tree_file
     # ... unless SLiM ts file has extension .orig
@@ -222,7 +224,7 @@ def sample_population_haplotypes(ts, popn_ids=(1,2,3), n_haps=100, check_loc=Non
 
 
 #%%
-def calc_ancestry_frac_over_region(ts, source_popn, recip_popn, time_since_adm):
+def calc_ancestry_frac(ts, source_popn, recip_popn, time_since_adm):
     """
     Calculates the fraction of ancestry from the source population seen in all
     extant samples from the recipient population.

@@ -179,7 +179,7 @@ def calc_stats (ts, sample_size, num_windows=100):
             p2_hapw = p2_hap[:,these_pos_idx]
             p3_hapw = p3_hap[:,these_pos_idx]
 
-            p1_freqw = calc_derived_freq (p1_hapw)  # why is this called "derived"? It's just a w/in pop'n allele freq
+            p1_freqw = calc_derived_freq (p1_hapw)
             p2_freqw = calc_derived_freq (p2_hapw)
             p3_freqw = calc_derived_freq (p3_hapw)
 
@@ -484,7 +484,7 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
                            neu_or_neg=dominance, n_scale=nscale)
 
     # Calculate how much source ancestry is present in today's recipient popn
-    mean_source_anc, source_anc_fracs, intervals = tt.calc_ancestry_frac_over_region(ts, source_popn, recip_popn, adm_gens_ago)
+    mean_source_anc, source_anc_fracs, intervals = tt.calc_ancestry_frac(ts, source_popn, recip_popn, adm_gens_ago)
         # Mean ancestry per 50kb window
     anc_by_window, anc_windows = calc_ancestry_window(source_anc_fracs, intervals)
 
