@@ -12,7 +12,8 @@ import numpy as np
 
 #%%
 def throw_neutral_muts(tree_file, region_info_file, neu_or_neg=0,
-                                  n_scale=10, initial_Ne=10000, verbose=False):
+                                  n_scale=10, unif_recomb=False,
+                                  initial_Ne=10000, verbose=False):
     """
     Recapitates .trees output from SLiM simulation and overlays neutral mutations.
     Writes out new .trees file with the neutral mutations.
@@ -44,32 +45,37 @@ def throw_neutral_muts(tree_file, region_info_file, neu_or_neg=0,
     ts : treeSeq
 
     """
+
+    ## Load ts
+    slim_ts = pyslim.load(tree_file)
+
     ## Set recombination map
     def make_region_recombination_map(region_filename):
-        positions = []
-        rates = []
-        with open(region_filename, 'r') as file:
-            for line in file:
-                if "recRate" in line:
-                    components = line.split(" ")
-                    positions.append(int(components[1]))
-                    rates.append(float(components[2]))
-        # adapted from https://pyslim.readthedocs.io/en/latest/tutorial.html#recapitation-with-a-nonuniform-recombination-map
-        # step 1
-        positions.insert(0, 0)
-        # step 2
-        rates.append(0.0)
-        # step 3
-        positions[-1] += 1
-
-        recomb_map = msprime.RecombinationMap(positions, rates)
+        if unif_recomb:
+            recomb_map = msprime.RecombinationMap.uniform_map(slim_ts.sequence_length, 1e-9)
+        else:
+            positions = []
+            rates = []
+            with open(region_filename, 'r') as file:
+                for line in file:
+                    if "recRate" in line:
+                        components = line.split(" ")
+                        positions.append(int(components[1]))
+                        rates.append(float(components[2]))
+            # adapted from https://pyslim.readthedocs.io/en/latest/tutorial.html#recapitation-with-a-nonuniform-recombination-map
+            # step 1
+            positions.insert(0, 0)
+            # step 2
+            rates.append(0.0)
+            # step 3
+            positions[-1] += 1
+            recomb_map = msprime.RecombinationMap(positions, rates)
         return recomb_map
 
     recomb_map = make_region_recombination_map(region_info_file)
 
-    ## Load ts and recapitate
-    slim_ts = pyslim.load(tree_file)
-    # loaded with pyslim, so a SLiMTreeSeq object.
+    ## Recapitate
+    # original ts loaded with pyslim, so a SLiMTreeSeq object.
     # https://pyslim.readthedocs.io/en/latest/python_api.html#pyslim.SlimTreeSequence.recapitate
     # why is default Ne=1?
     n_p1 = initial_Ne / n_scale
