@@ -543,9 +543,9 @@ if __name__=='__main__':
     #hs = 0 #0 = recessive or neutral; 1 = hs relationship
     dominance = 2 #if 0, run the deleterious recessive model #if 2, run the neutral model
     nscale = 10 #define scaling factor
-    m4s = 0 #adaptive selection strength
+    m4s = 0.01 #adaptive selection strength
     uniform_recombination = True
-    num_reps=5 #number of simulations per region
+    num_reps=10 #number of simulations per region
     region_all = ["chr11max","chr19region","chr3region","galnt18","hla","hyal2",
                   "krt71","nlrc5","oca2","pde6c","pou2f3","rnf34","sema6d","sgcb",
                   "sgcz","sipa1l2","slc16a11","slc19a3","slc5a10","stat2","tbx15",
@@ -569,7 +569,7 @@ if __name__=='__main__':
 
     attempt_num = np.random.randint(5000)
     print(attempt_num)
-    windowfile_name = dir_stem + "output/stats/20200715_sexAalt/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'-attempt' + str(attempt_num) + '_human_windows.txt'
+    windowfile_name = dir_stem + "output/stats/20200715_negVneu/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'-attempt' + str(attempt_num) + '_human_windows.txt'
     num_proc = 10
     manager = Manager()
     pool = Pool(processes=num_proc)
