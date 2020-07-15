@@ -313,23 +313,23 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
                     fields[0] = str(int(2))
                 elif line_counter == 47:  # AI variant emerges
                     fields[0] = str(int(100/nscale + 2))
-                elif line_counter == 50:  # locus for AI variant
+                elif line_counter == 53:  # locus for AI variant
                     fields[1] = str(int(insert_ai))
-                elif line_counter == 55:  # loop to check on AI variant
+                elif line_counter == 57:  # loop to check on AI variant
                     fields[0] = str(int(100/nscale + 2)) + ":"
-                elif line_counter == 68:  # locus for AI variant in loop
+                elif line_counter == 73:  # locus for AI variant in loop
                     fields[1] = str(int(insert_ai))
-                elif line_counter == 73:  # p2/p3 split
+                elif line_counter == 78:  # p2/p3 split
                     fields[0] = str(int(10000/nscale))
-                elif line_counter == 76:  # remember p2/p3 split
+                elif line_counter == 80:  # remember p2/p3 split
                     fields[0] = str(int(10000/nscale))
-                elif line_counter == 80:  # admixture generation early()
+                elif line_counter == 85:  # admixture generation early()
                     fields[0] = str(int(20000/nscale))  # TODO: replace by adm_gen
-                elif line_counter == 85:  # admixture generation late()
+                elif line_counter == 90:  # admixture generation late()
                     fields[0] = str(int(20000/nscale)) # TODO: replace by adm_gen
-                elif line_counter == 91:  # final generation
+                elif line_counter == 96:  # final generation
                     fields[0] = str(int(30000/nscale))  # TODO: replace by end_gen
-                elif line_counter == 92:  # write out .trees
+                elif line_counter == 97:  # write out .trees
                     fields[0] = 'sim.treeSeqOutput("' + trees_filename + '");'
 
             elif m4s != 2:   # recessive deleterious "negative" background model
@@ -346,23 +346,23 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
                     fields[0] = str(int(100000/nscale))
                 elif line_counter == 64:  # AI variant emerges
                     fields[0] = str(int(100/nscale) + int(100000/nscale))
-                elif line_counter == 67:  # locus for AI variant
+                elif line_counter == 70:  # locus for AI variant
                     fields[1] = str(int(insert_ai))
-                elif line_counter == 73:  # loop to check on AI variant
+                elif line_counter == 74:  # loop to check on AI variant
                     fields[0] = str(int(100/nscale) + int(100000/nscale))+":"
-                elif line_counter == 86:  # locus for AI variant in loop
+                elif line_counter == 90:  # locus for AI variant in loop
                     fields[1] = str(int(insert_ai))
-                elif line_counter == 91:  # p2/p3 split
+                elif line_counter == 95:  # p2/p3 split
                     fields[0] = str(int(110000/nscale))
-                elif line_counter == 94:  # remember p2/p3 split
+                elif line_counter == 98:  # remember p2/p3 split
                     fields[0] = str(int(110000/nscale))
-                elif line_counter == 98:  # admixture generation early()
+                elif line_counter == 102:  # admixture generation early()
                     fields[0] = str(int(120000/nscale))  # TODO: replace by adm_gen
-                elif line_counter == 103:  # admixture generation late()
+                elif line_counter == 107:  # admixture generation late()
                     fields[0] = str(int(120000/nscale))  # TODO: replace by adm_gen
-                elif line_counter == 109:  # final generation
+                elif line_counter == 113:  # final generation
                     fields[0] = str(int(130000/nscale))  # TODO: replace by end_gen
-                elif line_counter == 110:  # write out .trees
+                elif line_counter == 114:  # write out .trees
                     fields[0] = 'sim.treeSeqOutput("' + trees_filename + '");'
 
         elif model ==1:   #modelh
@@ -494,7 +494,7 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
     q.put([n,insert_ai,growth,mean_source_anc,anc_windows, anc_by_window, pos_start,pos_end, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
     #other parameter info are stored in the output file name
 
-    os.system('rm '+slim_output)
+    # os.system('rm '+slim_output)
     # os.system('rm '+treepath)
     # os.system('rm '+new_par)
 
@@ -506,7 +506,6 @@ def write_to_file(windowfile_name, q):
         if q_elem=='kill': # break if end of queue
             print ('END OF SIMULATIONS')
             break
-        print(len(q_elem))
         [n,insert_ai,growth,mean_source_anc,anc_windows, anc_by_window,pos_start,pos_end,Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list] = q_elem
         for i in range(len(Dstat_list)):
             format_string = "%d\t%d\t%d\t%f\t%d\t%d\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n"
@@ -527,7 +526,7 @@ def write_to_file(windowfile_name, q):
 #################################################################################
 if __name__=='__main__':
     # etc: sex param takes None, 'A', or 'X'
-    sex = 'A' #'A'
+    sex = 'X' #'A'
     #TODO: etc: these were originally commented out.  use to change defaults.
     whichgene = 14#+10  #1  15 was for project.  X is 25
     # model = 1 # 1=modelh; 0=model0 #define these two with parseargument
@@ -536,7 +535,7 @@ if __name__=='__main__':
     dominance = 0 #if 0, run the deleterious recessive model #if 2, run the neutral model
     nscale = 100 #define scaling factor
     m4s = 0.01 #adaptive selection strength
-    num_reps=1 #number of simulations per region
+    num_reps=10 #number of simulations per region
     region_all = ["chr11max","chr19region","chr3region","galnt18","hla","hyal2",
                   "krt71","nlrc5","oca2","pde6c","pou2f3","rnf34","sema6d","sgcb",
                   "sgcz","sipa1l2","slc16a11","slc19a3","slc5a10","stat2","tbx15",
