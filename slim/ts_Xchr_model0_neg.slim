@@ -1,50 +1,55 @@
 initialize() {
-	defineConstant("dominance", 0 ); //recessive = 0; additive = 0.5;
+	defineConstant("dominance", 0 ); //recessive = 0; additive = 0.5; 
 	defineConstant("n", 10 ); //scaling factor
 	defineConstant("m4s", 0.01 *n); //if m4s>0, adaptive introgression; else, deleterious null
 
-	// exon uses a mixture of syn and nonsyn at a 1:2.31 ratio (Huber et al.)
-	// to achieve an overall mutation rate of 1.5e-8, need 2.31/(1+2.31) fraction of all muts to be nonsyn
-	// i.e. ~0.6979 fraction of all muts IN EXONS should be the deleterious ones simulated here as "m1".
-	// the remaining ~0.3021 fraction of all mut.s IN EXONS should be thrown later as neutrals.
-
-	// For now, without mutation map, will have non-uniform mut. density along chr.
-	defineConstant("total_mu", 1.5e-8);
-	defineConstant("deleterious_fraction", 2.31/(1 + 2.31));
-	initializeMutationRate(total_mu * deleterious_fraction * n);
+   initializeMutationRate(1.5e-8*n);
 	//nonsynonymous drawn from a DFE from Kim et al.
 	// importantly, SLiM computes the fitness of the heterozygote and homozygote as 1+sh and 1+s
 	// dadi and others compute it as 1+2sh and 1+2s
-	initializeMutationType("m1", dominance, "g", -0.01314833*n, 0.186);
-	initializeMutationType("m4", 0.5, "f", 0.01*n); //adaptive
+    initializeMutationType("m1", dominance, "g", -0.01314833*n, 0.186);
+	//synonymous -- assumed neutral here
+	initializeMutationType("m2", 0.0, "f", 0.0);
+	initializeMutationType("m4", 0.5, "f", 0.01*n); //adaptive 	
 	//genomic element: exon and uses a mixture of syn and nonsyn at a 1:2.31 ratio (Huber et al.)
-	initializeGenomicElementType("g1", c(m1), c(2.31));
-
-	//read in exon and recomb info
-	info_lines = readFile("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/regions/sim_seq_info_sgcb.txt");
+	initializeGenomicElementType("g1", c(m2,m1), c(1.0,2.31));
+	//genomic element: not an exon
+	initializeGenomicElementType("g2", c(m2), c(1.0));	
+    
+    //read in exon and recomb info
+    info_lines = readFile("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/regions/sim_seq_info_X-0-5M.txt");
 	//recombination
-	rec_ends = NULL;
-	rec_rates = NULL;
-	for (line in info_lines[substr(info_lines, 0, 2) == "rec"])
-	{
-		components = strsplit(line, " ");
-		rec_ends = c(rec_ends, asInteger(components[1]));
-		rec_rates = c(rec_rates, asFloat(components[2]));
-	}
-	//multiply rec rates by scaling factor
-	initializeRecombinationRate(0.5*(1-(1-2* rec_rates )^n) , rec_ends) ;
-	//exons
-	for (line in info_lines[substr(info_lines, 0, 2) == "exo"])
-	{
-		components = strsplit(line, " ");
-		neu_starts = asInteger(components[1]);
-		neu_ends = asInteger(components[2]);
-		initializeGenomicElement(g1, neu_starts, neu_ends);
-	}
+    rec_ends = NULL;
+    rec_rates = NULL;
+    for (line in info_lines[substr(info_lines, 0, 2) == "rec"])
+    {
+        components = strsplit(line, " ");
+        rec_ends = c(rec_ends, asInteger(components[1]));
+        rec_rates = c(rec_rates, asFloat(components[2]));
+    }
+    //multiply rec rates by scaling factor
+    initializeRecombinationRate(0.5*(1-(1-2* rec_rates )^n) , rec_ends) ;
+    //non-exons
+    for (line in info_lines[substr(info_lines, 0, 2) == "non"])
+    {
+        components = strsplit(line, " ");
+        neu_starts = asInteger(components[1]);
+        neu_ends = asInteger(components[2]);
+        initializeGenomicElement(g2, neu_starts, neu_ends);
+    }
+    //exons
+    for (line in info_lines[substr(info_lines, 0, 2) == "exo"])
+    {
+        components = strsplit(line, " ");
+        exon_starts = asInteger(components[1]);
+        exon_ends = asInteger(components[2]);
+        initializeGenomicElement(g1, exon_starts, exon_ends);
+    }
 
-	initializeTreeSeq();
-	initializeSex( "A" ); // etc: spaces for ease of editing with line.split
+    initializeTreeSeq();
+    initializeSex( "X" );  // etc: spaces for ease of editing with line.split
 }
+
 
 
 //burn in
@@ -85,9 +90,9 @@ initialize() {
 			sim.readFromPopulationFile("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/tmp/" + simnum + ".txt");
 			setSeed(getSeed() + 1);
 			target = sample(p1.genomes, 1);
-//			while (target.isNullGenome) {  // In X-chr simulation, we've chosen a Y-chr placeholder
-//				target = sample(p1.genomes, 1);
-//			}
+			while (target.isNullGenome) {  // In X-chr simulation, we've chosen a Y-chr placeholder
+				target = sample(p1.genomes, 1);
+			}
 			target.addNewDrawnMutation(m4, 2500000 );
 		}
 	}
@@ -112,5 +117,5 @@ initialize() {
 }
 
 13000 late(){
-	sim.treeSeqOutput("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/trees/sgcb_m0_sexA.trees");
+	sim.treeSeqOutput("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/trees/X-0-5M_m0_sexX.trees");
 }

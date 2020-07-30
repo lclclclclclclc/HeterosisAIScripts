@@ -535,9 +535,9 @@ def write_to_file(windowfile_name, q):
 #################################################################################
 if __name__=='__main__':
     # etc: sex param takes None, 'A', or 'X'
-    sex = 'A' #'A'
+    sex = 'X' #'A'
     #TODO: etc: these were originally commented out.  use to change defaults.
-    whichgene = 1#+10  #1  15 was for project.  X is 25
+    whichgene = 15+10  #1  15 was for project.  X is 25
     # model = 1 # 1=modelh; 0=model0 #define these two with parseargument
     #growth = 4
     #hs = 0 #0 = recessive or neutral; 1 = hs relationship
