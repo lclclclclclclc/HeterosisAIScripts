@@ -145,7 +145,7 @@ def calc_derived_freq (pop_hap):
 
 
 def calc_stats (ts, sample_size, num_windows=100):
-    (p1_hap, p2_hap, p3_hap), all_pos = tt.sample_population_haplotypes(ts, n_haps=int(sample_size), check_loc=insert_ai)
+    (p1_hap, p2_hap, p3_hap), all_pos = tt.sample_population_haplotypes(ts, n_haps=int(sample_size))
 
     len_genome = ts.sequence_length
     allpos_bin = np.linspace(0,len_genome,num_windows) #windows of every 50kb
@@ -179,7 +179,7 @@ def calc_stats (ts, sample_size, num_windows=100):
             p2_hapw = p2_hap[:,these_pos_idx]
             p3_hapw = p3_hap[:,these_pos_idx]
 
-            p1_freqw = calc_derived_freq (p1_hapw)  # why is this called "derived"? It's just a w/in pop'n allele freq
+            p1_freqw = calc_derived_freq (p1_hapw)
             p2_freqw = calc_derived_freq (p2_hapw)
             p3_freqw = calc_derived_freq (p3_hapw)
 
@@ -282,7 +282,8 @@ def calc_stats (ts, sample_size, num_windows=100):
 
 
 def update_par_file(temp_par, new_par, model, growth, dominance,
-                    nscale, m4s, hs, insert_ai, sex, trees_filename, region_filename):
+                    nscale, m4s, hs, insert_ai, sex, uniform_recombination,
+                    trees_filename, region_filename):
 
     oldfile = open(temp_par)
     newfile = open(new_par,'w')
@@ -299,10 +300,13 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
                 fields[1] = str(nscale)
             elif line_counter == 3:
                 fields[1] = str(m4s)
-            if m4s == 2:  # neutral model
+            if dominance == 2:  # neutral model
                 if line_counter == 15:  # region info file
                     fields[2] = 'readFile("' + region_filename + '");'
-                elif line_counter == 29:  # initializeSex
+                elif uniform_recombination and (line_counter == 25):
+                    fields[1] = '1e-09'
+                    fields[3] = '); //'
+                elif line_counter == 28:  # initializeSex
                     if sex is None:  # comment out the call
                         fields[0] = '// ' + fields[0]
                     else:  # initializeSex as autosome or Xchr ("A" or "X")
@@ -321,7 +325,7 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
                     fields[1] = str(int(insert_ai))
                 elif line_counter == 78:  # p2/p3 split
                     fields[0] = str(int(10000/nscale))
-                elif line_counter == 80:  # remember p2/p3 split
+                elif line_counter == 81:  # remember p2/p3 split
                     fields[0] = str(int(10000/nscale))
                 elif line_counter == 85:  # admixture generation early()
                     fields[0] = str(int(20000/nscale))  # TODO: replace by adm_gen
@@ -332,9 +336,12 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
                 elif line_counter == 97:  # write out .trees
                     fields[0] = 'sim.treeSeqOutput("' + trees_filename + '");'
 
-            elif m4s != 2:   # recessive deleterious "negative" background model
+            elif dominance != 2:   # recessive deleterious "negative" background model
                 if line_counter == 23:  # region info file
                     fields[2] = 'readFile("' + region_filename + '");'
+                elif uniform_recombination and (line_counter == 34):
+                    fields[1] = '1e-09'
+                    fields[3] = '); //'
                 elif line_counter == 45:  # initializeSex
                     if sex is None:  # comment out the call
                         fields[0] = '// ' + fields[0]
@@ -417,7 +424,8 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
 
 
 
-def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex):
+def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex,
+                      uniform_recombination):
 
     # set filenames
     region_name = region_all[r]
@@ -465,8 +473,8 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
     adm_gens_ago = end_gen - adm_gen
 
     update_par_file(temp_par, new_par, model, growth, dominance,
-                    nscale, m4s, hs, insert_ai, sex, trees_filename+'.orig',
-                    region_info_filename)
+                    nscale, m4s, hs, insert_ai, sex, uniform_recombination,
+                    trees_filename+'.orig', region_info_filename)
 
     # this is the slim output file in MS format (0x and 1s for haplotypes)
     # TODO: Move away from writing/reading these.
@@ -481,10 +489,11 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
     # Overlay neutral mutations onto TreeSequence
     # TODO: variable-ize initial_Ne (size of p1 at beginning of sim)
     ts = tt.throw_neutral_muts(trees_filename+'.orig', region_info_filename,
-                           neu_or_neg=dominance, n_scale=nscale)
+                           neu_or_neg=dominance, n_scale=nscale,
+                           unif_recomb=uniform_recombination)
 
     # Calculate how much source ancestry is present in today's recipient popn
-    mean_source_anc, source_anc_fracs, intervals = tt.calc_ancestry_frac_over_region(ts, source_popn, recip_popn, adm_gens_ago)
+    mean_source_anc, source_anc_fracs, intervals = tt.calc_ancestry_frac(ts, source_popn, recip_popn, adm_gens_ago)
         # Mean ancestry per 50kb window
     anc_by_window, anc_windows = calc_ancestry_window(source_anc_fracs, intervals)
 
@@ -526,16 +535,17 @@ def write_to_file(windowfile_name, q):
 #################################################################################
 if __name__=='__main__':
     # etc: sex param takes None, 'A', or 'X'
-    sex = 'X' #'A'
+    sex = 'A' #'A'
     #TODO: etc: these were originally commented out.  use to change defaults.
-    whichgene = 14#+10  #1  15 was for project.  X is 25
+    whichgene = 1#+10  #1  15 was for project.  X is 25
     # model = 1 # 1=modelh; 0=model0 #define these two with parseargument
     #growth = 4
     #hs = 0 #0 = recessive or neutral; 1 = hs relationship
-    dominance = 0 #if 0, run the deleterious recessive model #if 2, run the neutral model
-    nscale = 100 #define scaling factor
-    m4s = 0.01 #adaptive selection strength
-    num_reps=10 #number of simulations per region
+    dominance = 2 #if 0, run the deleterious recessive model #if 2, run the neutral model
+    nscale = 10 #define scaling factor
+    m4s = 0 #adaptive selection strength
+    uniform_recombination = True
+    num_reps=1 #number of simulations per region
     region_all = ["chr11max","chr19region","chr3region","galnt18","hla","hyal2",
                   "krt71","nlrc5","oca2","pde6c","pou2f3","rnf34","sema6d","sgcb",
                   "sgcz","sipa1l2","slc16a11","slc19a3","slc5a10","stat2","tbx15",
@@ -548,19 +558,18 @@ if __name__=='__main__':
     DIR_tree = dir_stem + "output/trees/"
     DIR_par = dir_stem + "slim/"
 
-    # or loop over genes here I suppose
+    # Collect info about region
     r = int(whichgene-1)
-
     region_name = region_all[r]
-
+    region_info_file = DIR_region+"sim_seq_info_"+str(region_name)+".txt"
     # Find an exon in the middle-ish of the region...
-    window_start, window_end = find_ai_site(DIR_region+"sim_seq_info_"+str(region_name)+".txt")
+    window_start, window_end = find_ai_site(region_info_file)
     # ...and put the AI variant in the middle of that exon.
     insert_ai = int((int(window_end)+int(window_start))/2)
 
     attempt_num = np.random.randint(5000)
     print(attempt_num)
-    windowfile_name = dir_stem + "output/stats/20200709/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'-attempt' + str(attempt_num) + '_human_windows.txt'
+    windowfile_name = dir_stem + "output/stats/20200730/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'-attempt' + str(attempt_num) + '_human_windows.txt'
     num_proc = 10
     manager = Manager()
     pool = Pool(processes=num_proc)
@@ -571,15 +580,11 @@ if __name__=='__main__':
     for i in args_iterable:
         n=i[0]
         print(str(n))
-        run_slim_variable(i[0],i[1],r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex)
+        run_slim_variable(i[0],i[1],r,dominance,nscale,m4s,model,growth,hs,
+                          insert_ai, sex, uniform_recombination)
 
     q.put('kill')
     pool.close()
     pool.join()
-
-    # # peek at first line of stats file to check in on things
-    # with open(windowfile_name, 'r') as f:
-    #     print("First line of stats file for this run is below.")
-    #     print(f.readline())
 
     print("END OF SIMULATION")

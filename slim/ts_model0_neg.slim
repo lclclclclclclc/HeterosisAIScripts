@@ -32,7 +32,7 @@ initialize() {
 		rec_rates = c(rec_rates, asFloat(components[2]));
 	}
 	//multiply rec rates by scaling factor
-	initializeRecombinationRate(0.5*(1-(1-2*rec_rates)^n), rec_ends);
+	initializeRecombinationRate(0.5*(1-(1-2* rec_rates )^n) , rec_ends) ;
 	//exons
 	for (line in info_lines[substr(info_lines, 0, 2) == "exo"])
 	{

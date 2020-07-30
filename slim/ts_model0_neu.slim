@@ -23,7 +23,7 @@ initialize() {
 		rec_rates = c(rec_rates, asFloat(components[2]));
 	}
 	//multiply rec rates by scaling factor
-	initializeRecombinationRate(0.5*(1-(1-2*rec_rates)^n), rec_ends);
+	initializeRecombinationRate(0.5*(1-(1-2* rec_rates )^n) , rec_ends) ;
 
 	initializeTreeSeq();
 	initializeSex( "A" ); // etc: spaces for ease of editing with line.split
@@ -51,7 +51,7 @@ initialize() {
 		while (target.isNullGenome) {  // In X-chr simulation, we've chosen a Y-chr placeholder
 			target = sample(p1.genomes, 1);
 		}
-		target.addNewDrawnMutation(m4, 2500000 ); 
+		target.addNewDrawnMutation(m4, 2500000 );
 		sim.treeSeqOutput("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/tmp/" + simnum + ".txt");
 	}
 }
