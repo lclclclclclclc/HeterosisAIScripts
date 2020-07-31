@@ -13,7 +13,7 @@ import numpy as np
 #%%
 def throw_neutral_muts(tree_file, region_info_file, neu_or_neg=0,
                                   n_scale=10, unif_recomb=False,
-                                  initial_Ne=10000, verbose=False):
+                                  initial_Ne=10000, verbose=False, mut_rate=1.5e-8):
     """
     Recapitates .trees output from SLiM simulation and overlays neutral mutations.
     Writes out new .trees file with the neutral mutations.
@@ -99,7 +99,7 @@ def throw_neutral_muts(tree_file, region_info_file, neu_or_neg=0,
     # HOWEVER, this logic applies if we were only simulating exon regions.
 
     # TODO: set base mutation rate by variable?
-    mut_rate = 1.5e-8 * n_scale  # fine for neutral model;  will over-mutate exonic regions in neg
+    mut_rate *= n_scale  # fine for neutral model;  will over-mutate exonic regions in neg
     if neu_or_neg == 0:  # meaning the "neg" model of recessive deleterious var.
         mut_rate *= 1 / (1 + 2.31)  # will under-mutate non-exons
 

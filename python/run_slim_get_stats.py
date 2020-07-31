@@ -292,85 +292,61 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
         fields = line.split()
 
         if model == 0: # etc: only implementing m0 rn
-        # TODO: include hs?
-        # TODO: calculate timepoints using adm_gen and end_gen??
-            if line_counter == 1:
+            ## Set line numbers to change
+            sim_lines = [40, 43, 47, 53, 57, 73, 78, 81, 85, 90, 96, 97]
+            if dominance == 2:  # neutral model
+                reg_line, rec_line, sex_line = (15, 25, 28)
+            elif sex == 'X':  # deleterious, Xchr
+                sim_lines = [l + 23 for l in sim_lines]
+                reg_line, rec_line, sex_line = (20, 31, 50)
+            else:  # deleterious, A or None
+                sim_lines = [l + 17 for l in sim_lines]
+                reg_line, rec_line, sex_line = (23, 34, 45)
+            ## Set content for simulation section (not initialization)
+                    # TODO: calculate timepoints using adm_gen and end_gen??
+            if (dominance == 2) and (sex != 'X'):  # skip burn-in entirely
+                time_points = [2, 2,
+                             100/nscale + 2, 100/nscale + 2,
+                             10000/nscale, 10000/nscale,
+                             20000/nscale, 20000/nscale,
+                             30000/nscale]
+            else:  # need to burn in, set generations accordingly
+                time_points = [100000/nscale, 100000/nscale,
+                             100/nscale + 100000/nscale, 100/nscale + 100000/nscale,
+                             110000/nscale, 110000/nscale,
+                             120000/nscale, 120000/nscale,
+                             130000/nscale]
+            time_points.insert(3, insert_ai)
+            time_points.insert(5, insert_ai)
+            sim_content = [str(int(i)) for i in time_points]
+            sim_content[4] += ':'
+            sim_content.extend(['sim.treeSeqOutput("' + trees_filename + '");'])
+            assert len(sim_lines) == len(sim_content)
+            assert len(sim_lines) == 12
+            ## Write changes for simulation part
+            if line_counter in sim_lines:
+                idx = sim_lines.index(line_counter)
+                if idx in [3, 5]:  # this is an insert_ai for field 1
+                    fields[1] = sim_content[idx]
+                else:
+                    fields[0] = sim_content[idx]
+            ## Write changes for initialization part
+            elif line_counter == 1:
                 fields[1] = str(dominance)  # irrelevant in neutral model
             elif line_counter == 2:
                 fields[1] = str(nscale)
             elif line_counter == 3:
                 fields[1] = str(m4s)
-            if dominance == 2:  # neutral model
-                if line_counter == 15:  # region info file
-                    fields[2] = 'readFile("' + region_filename + '");'
-                elif uniform_recombination and (line_counter == 25):
-                    fields[1] = '1e-09'
-                    fields[3] = '); //'
-                elif line_counter == 28:  # initializeSex
-                    if sex is None:  # comment out the call
-                        fields[0] = '// ' + fields[0]
-                    else:  # initializeSex as autosome or Xchr ("A" or "X")
-                        fields[1] = '"' + str(sex) + '"'
-                elif line_counter == 40:  # p1/p2 split
-                    fields[0] = str(int(2))
-                elif line_counter == 43:  # remember p1/p2 split
-                    fields[0] = str(int(2))
-                elif line_counter == 47:  # AI variant emerges
-                    fields[0] = str(int(100/nscale + 2))
-                elif line_counter == 53:  # locus for AI variant
-                    fields[1] = str(int(insert_ai))
-                elif line_counter == 57:  # loop to check on AI variant
-                    fields[0] = str(int(100/nscale + 2)) + ":"
-                elif line_counter == 73:  # locus for AI variant in loop
-                    fields[1] = str(int(insert_ai))
-                elif line_counter == 78:  # p2/p3 split
-                    fields[0] = str(int(10000/nscale))
-                elif line_counter == 81:  # remember p2/p3 split
-                    fields[0] = str(int(10000/nscale))
-                elif line_counter == 85:  # admixture generation early()
-                    fields[0] = str(int(20000/nscale))  # TODO: replace by adm_gen
-                elif line_counter == 90:  # admixture generation late()
-                    fields[0] = str(int(20000/nscale)) # TODO: replace by adm_gen
-                elif line_counter == 96:  # final generation
-                    fields[0] = str(int(30000/nscale))  # TODO: replace by end_gen
-                elif line_counter == 97:  # write out .trees
-                    fields[0] = 'sim.treeSeqOutput("' + trees_filename + '");'
-
-            elif dominance != 2:   # recessive deleterious "negative" background model
-                if line_counter == 23:  # region info file
-                    fields[2] = 'readFile("' + region_filename + '");'
-                elif uniform_recombination and (line_counter == 34):
-                    fields[1] = '1e-09'
-                    fields[3] = '); //'
-                elif line_counter == 45:  # initializeSex
-                    if sex is None:  # comment out the call
-                        fields[0] = '// ' + fields[0]
-                    else:  # initializeSex as autosome or Xchr ("A" or "X")
-                        fields[1] = '"' + str(sex) + '"'
-                elif line_counter == 57:  # p1/p2 split
-                    fields[0] = str(int(100000/nscale))
-                elif line_counter == 60:  # remember p1/p2 split
-                    fields[0] = str(int(100000/nscale))
-                elif line_counter == 64:  # AI variant emerges
-                    fields[0] = str(int(100/nscale) + int(100000/nscale))
-                elif line_counter == 70:  # locus for AI variant
-                    fields[1] = str(int(insert_ai))
-                elif line_counter == 74:  # loop to check on AI variant
-                    fields[0] = str(int(100/nscale) + int(100000/nscale))+":"
-                elif line_counter == 90:  # locus for AI variant in loop
-                    fields[1] = str(int(insert_ai))
-                elif line_counter == 95:  # p2/p3 split
-                    fields[0] = str(int(110000/nscale))
-                elif line_counter == 98:  # remember p2/p3 split
-                    fields[0] = str(int(110000/nscale))
-                elif line_counter == 102:  # admixture generation early()
-                    fields[0] = str(int(120000/nscale))  # TODO: replace by adm_gen
-                elif line_counter == 107:  # admixture generation late()
-                    fields[0] = str(int(120000/nscale))  # TODO: replace by adm_gen
-                elif line_counter == 113:  # final generation
-                    fields[0] = str(int(130000/nscale))  # TODO: replace by end_gen
-                elif line_counter == 114:  # write out .trees
-                    fields[0] = 'sim.treeSeqOutput("' + trees_filename + '");'
+            elif line_counter == reg_line:  # region info file
+                fields[2] = 'readFile("' + region_filename + '");'
+            elif uniform_recombination and (line_counter == rec_line):
+                fields[1] = '1e-09'
+                fields[3] = '); //'
+            elif line_counter == sex_line:  # initializeSex
+                if sex is None:  # comment out the call
+                    fields[0] = '// ' + fields[0]
+                else:  # initializeSex as autosome or Xchr ("A" or "X")
+                    fields[1] = '"' + str(sex) + '"'
 
         elif model ==1:   #modelh
             if line_counter==1:
@@ -431,7 +407,7 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex,
     region_name = region_all[r]
     region_info_filename = dir_stem + 'regions/sim_seq_info_' + str(region_name) + '.txt'
     trees_filename = dir_stem + 'output/trees/'+str(region_name)+'_m'+str(model)+'_sex'+str(sex)+'.trees'
-    new_par = DIR_par +"par_"+region_name+str(dominance)+str(model)+ str(sex)+str(n)+".txt"
+    new_par = DIR_par +"par_"+region_name+'_m'+str(model)+'_sex'+str(sex)+'_'+str(dominance)+".txt"
 
 # etc: why were these vales not used in writing par files????
 # TODO: send these to update_par_file
@@ -456,41 +432,48 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex,
         recip_popn = 4  # etc: not sure
 
     elif model == 0:
-        if dominance !=2:
-            temp_par = dir_stem + "slim/ts_model0_neg.slim"
-            adm_gen = 120000/nscale
-            end_gen = 130000/nscale
-        elif dominance == 2:
-            temp_par = dir_stem + "slim/ts_model0_neu.slim"
-            # recap'ing obviates need for 10k of SLiM burn-in in neutral model
-            adm_gen = 20000/nscale
-            end_gen = 30000/nscale
         popsize = 1000 / nscale  # extant size of p3 (as split off from p2 in mod0)
         source_popn = 1
         recip_popn = 3
+        adm_gen = 120000/nscale
+        end_gen = 130000/nscale
+        if dominance !=2:  # deleterious model
+            if sex == 'X':
+                temp_par = dir_stem + "slim/ts_Xchr_model0_neg.slim"
+            else:
+                temp_par = dir_stem + "slim/ts_model0_neg.slim"
 
-    # segsize = 5000000  # nice that this is here, but hardcoded everywhere else
+        elif dominance == 2:  # neutral model
+            temp_par = dir_stem + "slim/ts_model0_neu.slim"
+            if sex == 'X':
+                temp_par = dir_stem + "slim/ts_Xchr_model0_neu.slim"
+            else:
+                temp_par = dir_stem + "slim/ts_model0_neu.slim"
+                # recap'ing obviates need for 10k of SLiM burn-in in neutral model
+                adm_gen = 20000/nscale
+                end_gen = 30000/nscale
     adm_gens_ago = end_gen - adm_gen
+    # segsize = 5000000  # nice that this is here, but hardcoded everywhere else
 
     update_par_file(temp_par, new_par, model, growth, dominance,
                     nscale, m4s, hs, insert_ai, sex, uniform_recombination,
                     trees_filename+'.orig', region_info_filename)
 
-    # this is the slim output file in MS format (0x and 1s for haplotypes)
-    # TODO: Move away from writing/reading these.
-    # See below to extract from ts after throwing neutrals?
-    # https://tskit.readthedocs.io/en/latest/python-api.html#tskit.TreeSequence.haplotypes !!!!
-    # https://tskit.readthedocs.io/en/latest/python-api.html#tskit.TreeSequence.variants
-    slim_output = DIR_out +'OUT_'+region_name+str(sex)+str(m4s)+ str(n)+".txt"
+    slim_stdout = DIR_out +'OUT_'+region_name+str(sex)+str(m4s)+ str(n)+".txt"
 
     # Run the SLiM simulation!
-    os.system('slim %s > %s' %(new_par, slim_output))
+    os.system('slim %s > %s' %(new_par, slim_stdout))
 
     # Overlay neutral mutations onto TreeSequence
     # TODO: variable-ize initial_Ne (size of p1 at beginning of sim)
-    ts = tt.throw_neutral_muts(trees_filename+'.orig', region_info_filename,
+    trees_from_slim = trees_filename+'.orig'
+    if sex == 'X':  # do not overlay any mutations with msp.  All done forward.
+        msp_mut_rate = 0
+    else:
+        msp_mut_rate = 1.5e-8  # will be scaled by nscale in function
+    ts = tt.throw_neutral_muts(trees_from_slim, region_info_filename,
                            neu_or_neg=dominance, n_scale=nscale,
-                           unif_recomb=uniform_recombination)
+                           unif_recomb=uniform_recombination, mut_rate=msp_mut_rate)
 
     # Calculate how much source ancestry is present in today's recipient popn
     mean_source_anc, source_anc_fracs, intervals = tt.calc_ancestry_frac(ts, source_popn, recip_popn, adm_gens_ago)
@@ -503,7 +486,7 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex,
     q.put([n,insert_ai,growth,mean_source_anc,anc_windows, anc_by_window, pos_start,pos_end, Dstat_list, fD_list, Het_list, divratioavg_list,Q_1_100_q95_list,Q_1_100_q90_list,Q_1_100_max_list,U_1_0_100_list,U_1_20_100_list,U_1_50_100_list,U_1_80_100_list])
     #other parameter info are stored in the output file name
 
-    # os.system('rm '+slim_output)
+    # os.system('rm '+slim_stdout)
     # os.system('rm '+treepath)
     # os.system('rm '+new_par)
 
@@ -534,25 +517,17 @@ def write_to_file(windowfile_name, q):
 
 #################################################################################
 if __name__=='__main__':
-    # etc: sex param takes None, 'A', or 'X'
-    sex = 'X' #'A'
-    #TODO: etc: these were originally commented out.  use to change defaults.
+    # Set params.  (See parser defaults.)
+    sex = None #'A'  # etc: sex param takes None, 'A', or 'X'
     whichgene = 15+10  #1  15 was for project.  X is 25
-    # model = 1 # 1=modelh; 0=model0 #define these two with parseargument
-    #growth = 4
-    #hs = 0 #0 = recessive or neutral; 1 = hs relationship
     dominance = 2 #if 0, run the deleterious recessive model #if 2, run the neutral model
-    nscale = 10 #define scaling factor
-    m4s = 0 #adaptive selection strength
+    nscale = 100 #define scaling factor
+    m4s = 0.01 #adaptive selection strength
     uniform_recombination = True
     num_reps=1 #number of simulations per region
-    region_all = ["chr11max","chr19region","chr3region","galnt18","hla","hyal2",
-                  "krt71","nlrc5","oca2","pde6c","pou2f3","rnf34","sema6d","sgcb",
-                  "sgcz","sipa1l2","slc16a11","slc19a3","slc5a10","stat2","tbx15",
-                  "tlr1610","tnfa1p3","txn", 'X-0-5M']
 
+    # Set directories
     dir_stem = "/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/"
-
     DIR_region = dir_stem + "regions/"
     DIR_out = dir_stem + "output/out/"
     DIR_tree = dir_stem + "output/trees/"
@@ -560,6 +535,10 @@ if __name__=='__main__':
 
     # Collect info about region
     r = int(whichgene-1)
+    region_all = ["chr11max","chr19region","chr3region","galnt18","hla","hyal2",
+                  "krt71","nlrc5","oca2","pde6c","pou2f3","rnf34","sema6d","sgcb",
+                  "sgcz","sipa1l2","slc16a11","slc19a3","slc5a10","stat2","tbx15",
+                  "tlr1610","tnfa1p3","txn", 'X-0-5M']
     region_name = region_all[r]
     region_info_file = DIR_region+"sim_seq_info_"+str(region_name)+".txt"
     # Find an exon in the middle-ish of the region...
@@ -567,6 +546,7 @@ if __name__=='__main__':
     # ...and put the AI variant in the middle of that exon.
     insert_ai = int((int(window_end)+int(window_start))/2)
 
+    # Run simulations and calculate statistics
     attempt_num = np.random.randint(5000)
     print(attempt_num)
     windowfile_name = dir_stem + "output/stats/20200730/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'-attempt' + str(attempt_num) + '_human_windows.txt'

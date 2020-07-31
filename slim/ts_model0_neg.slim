@@ -2,21 +2,21 @@ initialize() {
 	defineConstant("dominance", 0 ); //recessive = 0; additive = 0.5;
 	defineConstant("n", 10 ); //scaling factor
 	defineConstant("m4s", 0.01 *n); //if m4s>0, adaptive introgression; else, deleterious null
+	defineConstant("total_mu", 1.5e-8 );
 
 	// exon uses a mixture of syn and nonsyn at a 1:2.31 ratio (Huber et al.)
 	// to achieve an overall mutation rate of 1.5e-8, need 2.31/(1+2.31) fraction of all muts to be nonsyn
 	// i.e. ~0.6979 fraction of all muts IN EXONS should be the deleterious ones simulated here as "m1".
 	// the remaining ~0.3021 fraction of all mut.s IN EXONS should be thrown later as neutrals.
-
 	// For now, without mutation map, will have non-uniform mut. density along chr.
-	defineConstant("total_mu", 1.5e-8);
+	
 	defineConstant("deleterious_fraction", 2.31/(1 + 2.31));
 	initializeMutationRate(total_mu * deleterious_fraction * n);
 	//nonsynonymous drawn from a DFE from Kim et al.
 	// importantly, SLiM computes the fitness of the heterozygote and homozygote as 1+sh and 1+s
 	// dadi and others compute it as 1+2sh and 1+2s
 	initializeMutationType("m1", dominance, "g", -0.01314833*n, 0.186);
-	initializeMutationType("m4", 0.5, "f", 0.01*n); //adaptive
+	initializeMutationType("m4", 0.5, "f", m4s); //adaptive
 	//genomic element: exon and uses a mixture of syn and nonsyn at a 1:2.31 ratio (Huber et al.)
 	initializeGenomicElementType("g1", c(m1), c(2.31));
 

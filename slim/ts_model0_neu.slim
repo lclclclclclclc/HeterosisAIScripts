@@ -2,11 +2,11 @@ initialize() {
 	defineConstant("dominance", 0 ); // unused in neutral model; recessive = 0; additive = 0.5;
 	defineConstant("n", 10 ); // scaling factor
 	defineConstant("m4s", 0.01 *n); // if m4s>0, adaptive introgression; else, deleterious null
+	defineConstant("total_mu", 0 );
 
-	defineConstant("total_mu", 0);
-	initializeMutationRate(total_mu * n);
+	initializeMutationRate(total_mu*n);
 	initializeMutationType("m1", 0.5, "f", 0); // placeholder type.  No mutations will be placed by SLiM
-	initializeMutationType("m4", 0.5, "f", 0.01*n); // adaptive
+	initializeMutationType("m4", 0.5, "f", m4s); // adaptive
 
 	initializeGenomicElementType("g1", m1, 1); // placeholder type.  No mutations will be placed by SLiM
 	initializeGenomicElement(g1, 0, 4999999);
@@ -68,10 +68,10 @@ initialize() {
 			sim.readFromPopulationFile("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/tmp/" + simnum + ".txt");
 			setSeed(getSeed() + 1);
 			target = sample(p1.genomes, 1);
-			while (target.isNullGenome) {  // In X-chr simulation, we've chosen a Y-chr placeholder
-				target = sample(p1.genomes, 1);
-			}
-			target.addNewDrawnMutation(m4, 2500000 );  // TODO: change to insert_ai
+//			while (target.isNullGenome) {  // In X-chr simulation, we've chosen a Y-chr placeholder
+//				target = sample(p1.genomes, 1);
+//			}
+			target.addNewDrawnMutation(m4, 2500000 );
 		}
 	}
 }

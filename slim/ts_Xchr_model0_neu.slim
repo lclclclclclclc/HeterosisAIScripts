@@ -1,19 +1,19 @@
 initialize() {
-	defineConstant("dominance", 0 ); //recessive = 0; additive = 0.5; 
-	defineConstant("n", 10 ); //scaling factor
-	defineConstant("m4s", 0.01 *n); //if m4s>0, adaptive introgression; else, deleterious null
-
-    initializeMutationRate(1.5e-8*n);
+	defineConstant("dominance", 0 ); // unused in neutral model; recessive = 0; additive = 0.5;
+	defineConstant("n", 10 ); // scaling factor
+	defineConstant("m4s", 0.01 *n); // if m4s>0, adaptive introgression; else, deleterious null
+	defineConstant("total_mu", 1.5e-8 );
+    
+    initializeMutationRate(total_mu*n);
     initializeMutationType("m1", 0.5, "f", 0);
-	initializeMutationType("m4", 0.5, "f", 0.01*n); //adaptive 	
+	initializeMutationType("m4", 0.5, "f", m4s); // adaptive 	
 
 	initializeGenomicElementType("g1", m1, 1);
     initializeGenomicElement(g1, 0, 4999999);
 
     // recombination
-    // read in recomb info
+    // read in recomb info.
     info_lines = readFile("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/regions/sim_seq_info_X-0-5M.txt");
-	//recombination
     rec_ends = NULL;
     rec_rates = NULL;
     for (line in info_lines[substr(info_lines, 0, 2) == "rec"])
@@ -28,7 +28,6 @@ initialize() {
     initializeTreeSeq();
     initializeSex( "X" );  // etc: spaces for ease of editing with line.split
 }
-
 
 
 //burn in
