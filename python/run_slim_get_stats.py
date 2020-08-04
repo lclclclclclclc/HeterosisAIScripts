@@ -213,13 +213,12 @@ def calc_stats (ts, sample_size, num_windows=100):
 
         # Heterozygosity
             hetvec = 2 * p3_freqw * (1.0 - p3_freqw)
-            Het = np.sum(hetvec) /50000  # etc: again, hardcoded window length
+            Het = np.sum(hetvec) / 50000  # etc: again, hardcoded window length
             Het_list.append(Het)
 
             # TODO: Re-implement this
             # divratio = []
-            # # for archi in range(p1_hapw.shape[0]): #iterate over 0-99 haps; 100 total)
-            # for archi in range(0, 3): # TODO: etc: put this back.  just smaller for testing p1_hapw.shape[0]): #iterate over 0-99 haps; 100 total
+            # for archi in range(p1_hapw.shape[0]): #iterate over 0-99 haps; 100 total)
             #     divarchintro = vSumFunc(p3_hapw, archi,p1_hapw)
             #     divarchintro = divarchintro.astype("float")
             #     divarchnonintro = vSumFunc(p2_hapw, archi,p1_hapw)
@@ -236,7 +235,7 @@ def calc_stats (ts, sample_size, num_windows=100):
             ArcHomoDer = (p1_freqw == 1)
             NonAdm_1 = (p2_freqw < 0.01)
             ArcHomoDerANDNonAdm_1 = (ArcHomoDer & NonAdm_1)
-            DerFreqs_NonAdm_1 = p3_freqw[np.where(ArcHomoDerANDNonAdm_1 == True)]
+            DerFreqs_NonAdm_1 = p3_freqw[ArcHomoDerANDNonAdm_1]
             if DerFreqs_NonAdm_1.size > 0:
                 Q_1_100_q95 = np.percentile(DerFreqs_NonAdm_1,95)
                 Q_1_100_q90 = np.percentile(DerFreqs_NonAdm_1,90)
@@ -464,16 +463,14 @@ def run_slim_variable(n,q,r,dominance,nscale,m4s,model,growth,hs,insert_ai, sex,
     # Run the SLiM simulation!
     os.system('slim %s > %s' %(new_par, slim_stdout))
 
-    # Overlay neutral mutations onto TreeSequence
+    # Recapitate and process TreeSequence from SLiM:
+    # overlay neutral mutations if applicable
+    # remove Y chr if applicable
     # TODO: variable-ize initial_Ne (size of p1 at beginning of sim)
     trees_from_slim = trees_filename+'.orig'
-    if sex == 'X':  # do not overlay any mutations with msp.  All done forward.
-        msp_mut_rate = 0
-    else:
-        msp_mut_rate = 1.5e-8  # will be scaled by nscale in function
-    ts = tt.throw_neutral_muts(trees_from_slim, region_info_filename,
-                           neu_or_neg=dominance, n_scale=nscale,
-                           unif_recomb=uniform_recombination, mut_rate=msp_mut_rate)
+    ts = tt.process_treeseq(trees_from_slim, region_info_filename,
+                           neu_or_neg=dominance, sex=sex, n_scale=nscale,
+                           unif_recomb=uniform_recombination, mut_rate=base_mut_rate)
 
     # Calculate how much source ancestry is present in today's recipient popn
     mean_source_anc, source_anc_fracs, intervals = tt.calc_ancestry_frac(ts, source_popn, recip_popn, adm_gens_ago)
@@ -518,12 +515,15 @@ def write_to_file(windowfile_name, q):
 #################################################################################
 if __name__=='__main__':
     # Set params.  (See parser defaults.)
-    sex = None #'A'  # etc: sex param takes None, 'A', or 'X'
+    sex = 'X'  # etc: sex param takes None, 'A', or 'X'
     whichgene = 15+10  #1  15 was for project.  X is 25
-    dominance = 2 #if 0, run the deleterious recessive model #if 2, run the neutral model
-    nscale = 100 #define scaling factor
+
+    dominance = 0 #if 0, run the deleterious recessive model #if 2, run the neutral model
     m4s = 0.01 #adaptive selection strength
-    uniform_recombination = True
+    uniform_recombination = 1e-09
+    base_mut_rate = 1.5e-8
+
+    nscale = 100 #define scaling factor
     num_reps=1 #number of simulations per region
 
     # Set directories
@@ -549,7 +549,7 @@ if __name__=='__main__':
     # Run simulations and calculate statistics
     attempt_num = np.random.randint(5000)
     print(attempt_num)
-    windowfile_name = dir_stem + "output/stats/20200730/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'-attempt' + str(attempt_num) + '_human_windows.txt'
+    windowfile_name = dir_stem + "output/stats/20200806/"+region_name+"-dominance"+str(dominance)+"-model"+str(model)+"-sex"+str(sex)+"-hs"+str(hs)+"-ai"+str(m4s)+'-attempt' + str(attempt_num) + '_human_windows.txt'
     num_proc = 10
     manager = Manager()
     pool = Pool(processes=num_proc)
