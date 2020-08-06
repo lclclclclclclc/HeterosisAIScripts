@@ -10,10 +10,10 @@ import pyslim
 import msprime
 import numpy as np
 
-#%%
+
 def process_treeseq(tree_file, region_info_file, neu_or_neg=0, sex=None,
-                                  n_scale=10, unif_recomb=False,
-                                  initial_Ne=10000, verbose=False, mut_rate=1.5e-8):
+                    n_scale=10, unif_recomb=False, initial_Ne=10000,
+                    verbose=False, mut_rate=1.5e-8):
     """
     Recapitates .trees output from SLiM simulation and further processes:
         Unless simulating the Xchr, we overlay neutral mutations using msprime.
@@ -48,10 +48,10 @@ def process_treeseq(tree_file, region_info_file, neu_or_neg=0, sex=None,
 
     """
 
-    ## Load ts
+    # Load ts
     slim_ts = pyslim.load(tree_file)
 
-    ## Set recombination map
+    # Set recombination map
     def make_region_recombination_map(region_filename):
         if unif_recomb:
             recomb_map = msprime.RecombinationMap.uniform_map(slim_ts.sequence_length, unif_recomb)
@@ -76,7 +76,7 @@ def process_treeseq(tree_file, region_info_file, neu_or_neg=0, sex=None,
 
     recomb_map = make_region_recombination_map(region_info_file)
 
-    ## Recapitate
+    # Recapitate
     # original ts loaded with pyslim, so a SLiMTreeSeq object.
     # https://pyslim.readthedocs.io/en/latest/python_api.html#pyslim.SlimTreeSequence.recapitate
     # why is default Ne=1?
@@ -93,7 +93,7 @@ def process_treeseq(tree_file, region_info_file, neu_or_neg=0, sex=None,
                  if recap_ts.node(s).metadata.genome_type == 1]
         ts = recap_ts.simplify(samples=xchrs)
     else:
-        ## Throw mutations
+        # Throw mutations
         # TODO: Wait for mutationMaps to magically appear?
         # Need mutation rate variation to ensure equal density of mutations along chromosome
         # Mutation rate maps are coming to msprime... I think they're already implemented but not doc'd.
@@ -111,7 +111,7 @@ def process_treeseq(tree_file, region_info_file, neu_or_neg=0, sex=None,
             mut_rate *= 1 / (1 + 2.31)  # will under-mutate non-exons
         ts = pyslim.SlimTreeSequence(msprime.mutate(recap_ts, rate=mut_rate, keep=True))
 
-    ## Write out .trees file
+    # Write out .trees file
     # default is still to overwrite...
     out_name = tree_file
     # ... unless SLiM ts file has extension .orig
@@ -119,14 +119,14 @@ def process_treeseq(tree_file, region_info_file, neu_or_neg=0, sex=None,
         out_name = tree_file[:-5]
     ts.dump(out_name)
 
-    ## Messing around
+    # Messing around
     if verbose:
         import matplotlib.pyplot as plt
         import numpy as np
 
         # Mess around with original ts
         print(f"There are {slim_ts.num_individuals} individuals in the SLiM tree.")
-        founders=slim_ts.first_generation_individuals()
+        founders = slim_ts.first_generation_individuals()
         initial_pops = [slim_ts.individual(f).population for f in founders]
         print(f"Population(s) represented in the founders: {np.unique(initial_pops)}.")
         # numpy array of how long ago each individual was born
@@ -153,7 +153,6 @@ def process_treeseq(tree_file, region_info_file, neu_or_neg=0, sex=None,
     return ts
 
 
-#%%
 def translate_from_slim_pop(tree_seq, s_ids=None):
     popkey = [(p.id, p.metadata.slim_id) for p in tree_seq.populations()
               if p.metadata is not None]
@@ -165,8 +164,7 @@ def translate_from_slim_pop(tree_seq, s_ids=None):
     return tuple(np.asarray(pops)[indices_of_slim_pops])
 
 
-#%%
-def sample_population_haplotypes(ts, popn_ids=(1,2,3), n_haps=100, check_loc=None):
+def sample_population_haplotypes(ts, popn_ids=(1, 2, 3), n_haps=100, check_loc=None):
     """
     Using a tree sequence, takes extant samples from three populations
     and generates both haplotype matrices (n_haps x [number of variants]) for each
@@ -199,32 +197,34 @@ def sample_population_haplotypes(ts, popn_ids=(1,2,3), n_haps=100, check_loc=Non
     def sample_extant_haplotypes(population, n_haps):
         # TODO: later, make sure this is a sample with the correct sex ratio.
         all_samps = np.asarray([ts.node(n).id for n in ts.samples(population=population)
-                             if (ts.node(n).time == 0)])
+                                if (ts.node(n).time == 0)])
         return np.random.choice(all_samps, size=n_haps, replace=False)
 
-    ## Sample down to n_haps extant nodes per population
+    # Sample down to n_haps extant nodes per population.
     # TODO: should I be sampling individuals and keeping both their nodes?
-    #       perhaps not if I want to do same for sex chromosomes
+    # Perhaps not if I want to do same for sex chromosomes.
     extant_samples = np.concatenate((sample_extant_haplotypes(ts_popn_ids[0], n_haps),
                                     sample_extant_haplotypes(ts_popn_ids[1], n_haps),
                                     sample_extant_haplotypes(ts_popn_ids[2], n_haps)))
-    # reduce ts to only these samples so the matrix isn't too big
+    # Reduce ts to only these samples so the matrix isn't too big.
+    # "In the returned tree sequence, the node with ID 0 corresponds to samples[0],
+    # node 1 corresponds to samples[1], and so on.  Besides the samples, node IDs
+    # in the returned tree sequence are then allocated sequentially in time order.
     sts = ts.simplify(samples=extant_samples, reduce_to_site_topology=True)
-        # In the returned tree sequence, the node with ID 0 corresponds to samples[0], node 1 corresponds to samples[1], and so on. Besides the samples, node IDs in the returned tree sequence are then allocated sequentially in time order.
 
-    ## Generate the haplotypes
+    # Generate the haplotypes
     haplotype_matrix = sts.genotype_matrix()
-    # flip to match other code: make rows individual haplotypes, columns -> vars
+    # Flip to match other code: make rows individual haplotypes, columns -> vars
     hap_mat = np.transpose(haplotype_matrix)
 
-    ## Split haplotype matrix into population-specific matrices
+    # Split haplotype matrix into population-specific matrices
     p1_haps = hap_mat[:n_haps, :]
     p2_haps = hap_mat[n_haps:2*n_haps, :]
     p3_haps = hap_mat[2*n_haps:, :]
-    # check that we've broken up the array without missing or duplicating any haps
+    # Check that we've broken up the array without missing or duplicating any haps
     assert np.all(np.vstack((p1_haps, p2_haps, p3_haps)) == hap_mat)
 
-    ## Get positions of mutations in chr coordinates
+    # Get positions of mutations in chr coordinates.
     # check that hap_mat contains all the sites
     assert sts.num_sites == np.shape(hap_mat)[1]
     positions = np.asarray([s.position for s in sts.sites()])
@@ -234,7 +234,6 @@ def sample_population_haplotypes(ts, popn_ids=(1,2,3), n_haps=100, check_loc=Non
     return (p1_haps, p2_haps, p3_haps), positions
 
 
-#%%
 def calc_ancestry_frac(ts, source_popn, recip_popn, time_since_adm):
     """
     Calculates the fraction of ancestry from the source population seen in all
@@ -303,12 +302,12 @@ def calc_ancestry_frac(ts, source_popn, recip_popn, time_since_adm):
 
     sts = ts.simplify(samples=samples_to_keep)
     # TODO: what precisely does reduce_to_site_topology do?
-        # It certainly has an effect:  simplified tree goes from 15k trees to 6.7k trees.
+    #   It certainly has an effect:  simplified tree goes from 15k trees to 6.7k trees.
     # After simplifying, now have new node ids for samples.  Need to split them out again.
-        # Could (1) go by length of array chunks
-        # (2) something with map_nodes=True in simplify call
-        # (3) do same listcomps as above
-        # (4) take the whole issue to SLiM and try to flag the intogressors specifically
+    #   Could (1) go by length of array chunks
+    #   (2) something with map_nodes=True in simplify call
+    #   (3) do same listcomps as above
+    #   (4) take the whole issue to SLiM and try to flag the intogressors specifically
     # For now, do option (3) via helper function.
 
     # these are being overwritten into new node_ids in the simplified ts world
@@ -327,15 +326,15 @@ def calc_ancestry_frac(ts, source_popn, recip_popn, time_since_adm):
     assert np.all(recip_parents_from_source + recip_parents_from_recip == recip_parents)
 
     # What is this trying to do?
-    # # my original guess:
-    # Return the fraction of all the "living"
-    # (i.e. alive at end of simulation) recipient haplotypes that trace their
-    # ancestry to the introgressing population.
-    # This should be 10% in a "null" model, as the introgression event makes
-    # the recipient population 90% recipient, 10% donor (in model 0, 90% pop3, 10% pop1).
-    # # what I think now is largely the same
-        # tree_p has length of ts.num_trees
-        # for each tree (chr interval), give fract [as above].
+    # my original guess:
+    #   Return the fraction of all the "living"
+    #   (i.e. alive at end of simulation) recipient haplotypes that trace their
+    #   ancestry to the introgressing population.
+    #   This should be 10% in a "null" model, as the introgression event makes
+    #   the recipient population 90% recipient, 10% donor (in model 0, 90% pop3, 10% pop1).
+    # what I think now is largely the same
+    #   tree_p has length of ts.num_trees
+    #   for each tree (chr interval), give fract [as above].
     # TODO: check on ability to make u a list.  suggested in docs
     if len(recip_parents_from_source) < 1:
         print("lost all source ancestry")
@@ -345,7 +344,7 @@ def calc_ancestry_frac(ts, source_popn, recip_popn, time_since_adm):
                               for t in sts.trees(tracked_samples=r_t, sample_lists=True)]
     source_anc_frac_by_tree = np.asarray(source_anc_sum_by_tree) / len(r_t)
     assert sts.num_trees == len(source_anc_frac_by_tree)
-    # grab the windows and the sequence-wide weighted average
+    # Grab the windows and the sequence-wide weighted average.
     source_anc_tree_intervals = [t.interval for t in sts.trees()]
     interval_spans = [t.span for t in sts.trees()]
     mean_source_anc = np.average(source_anc_frac_by_tree, weights=interval_spans)
