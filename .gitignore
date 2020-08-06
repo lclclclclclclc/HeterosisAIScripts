@@ -1,5 +1,8 @@
 
-output/
+output/tmp/*
+output/trees/*
+output/stats/*
+output/out/*
 
 regions/*
 
@@ -8,6 +11,14 @@ regions/*
 
 python/profile_archi3.Result
 
-slim/par_sgcz00A0.txt
+slim/par*
+slim/tmp.out
 
-slim/par_sgcz00None0.txt
+.RData
+
+*.tmp
+*.pyc
+
+python/profiling/
+
+other/
