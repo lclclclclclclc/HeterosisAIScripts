@@ -490,7 +490,6 @@ def write_to_file(windowfile_name, q):
     while 1:  # etc: terrifying
         q_elem = q.get()
         if q_elem == 'kill':  # break if end of queue
-            print('END OF SIMULATIONS')
             break
         [n, insert_ai, growth, mean_source_anc, anc_windows, anc_by_window, pos_start, pos_end, Dstat_list, fD_list, Het_list, divratioavg_list, Q_1_100_q95_list, Q_1_100_q90_list, Q_1_100_max_list, U_1_0_100_list, U_1_20_100_list, U_1_50_100_list, U_1_80_100_list] = q_elem
         for i in range(len(Dstat_list)):
@@ -567,8 +566,10 @@ if __name__ == '__main__':
                           hs, insert_ai, sex, uniform_recombination,
                           control_sex_ratio=control_sex_ratio)
 
+    # Clean up
     q.put('kill')
     pool.close()
     pool.join()
-
-    print("END OF SIMULATION")
+    print("Finished all simulations.")
+    # Remove intermediate SLiM states
+    os.system("rm " + dir_stem + "output/tmp/*.txt")
