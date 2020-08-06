@@ -9,6 +9,7 @@ Created on Fri Jun 26 10:51:27 2020
 import pyslim
 import msprime
 import numpy as np
+import warnings
 
 
 def process_treeseq(tree_file, region_info_file, neu_or_neg=0, sex=None,
@@ -33,21 +34,23 @@ def process_treeseq(tree_file, region_info_file, neu_or_neg=0, sex=None,
     n_scale : int, optional
         Scaling factor. The default is 10.
     initial_Ne : int, optional
-        Initial population size of founding population (p1). The default is 10000.
+        Initial population size of founding population (p1).
+        The default is 10000.
     verbose : bool, optional
-        Print info about treeseqs before and after recapitation. The default is False.
+        Print info about treeseqs before and after recapitation.
+        The default is False.
 
     Output
     ------
-    Writes out .trees file, recapitated, with EITHER neutral mutations overlayed OR Y chr removed.
-    Currently OVERWRITES the original .trees file UNLESS the original has ext '.orig'
+    Writes out .trees file, recapitated, with EITHER neutral mutations
+    overlayed OR Y chr removed.  Currently OVERWRITES the original .trees file
+    UNLESS the original has ext '.orig'.
 
     Returns
     ------
     ts : treeSeq
 
     """
-
     # Load ts
     slim_ts = pyslim.load(tree_file)
 
@@ -90,7 +93,7 @@ def process_treeseq(tree_file, region_info_file, neu_or_neg=0, sex=None,
     if sex == 'X':
         # simplify to remove y chromosomes
         xchrs = [recap_ts.node(s).id for s in recap_ts.samples()
-                 if recap_ts.node(s).metadata.genome_type == 1]
+                 if recap_ts.node(s).metadata.genome_type == pyslim.GENOME_TYPE_X]
         ts = recap_ts.simplify(samples=xchrs)
     else:
         # Throw mutations
@@ -164,7 +167,8 @@ def translate_from_slim_pop(tree_seq, s_ids=None):
     return tuple(np.asarray(pops)[indices_of_slim_pops])
 
 
-def sample_population_haplotypes(ts, popn_ids=(1, 2, 3), n_haps=100, check_loc=None):
+def sample_population_haplotypes(ts, popn_ids=(1, 2, 3), sex_ratio_fm=False,
+                                 n_haps=100, check_loc=None):
     """
     Using a tree sequence, takes extant samples from three populations
     and generates both haplotype matrices (n_haps x [number of variants]) for each
@@ -194,18 +198,53 @@ def sample_population_haplotypes(ts, popn_ids=(1, 2, 3), n_haps=100, check_loc=N
     """
     ts_popn_ids = translate_from_slim_pop(ts, s_ids=popn_ids)
 
-    def sample_extant_haplotypes(population, n_haps):
-        # TODO: later, make sure this is a sample with the correct sex ratio.
+    # Sample down to n_haps extant nodes per population.
+    def sample_extant_haplotypes(population, n_haps, sex_ratio_fm):
         all_samps = np.asarray([ts.node(n).id for n in ts.samples(population=population)
                                 if (ts.node(n).time == 0)])
-        return np.random.choice(all_samps, size=n_haps, replace=False)
+        if sex_ratio_fm:
+            num_female_haps = round(n_haps * (sex_ratio_fm[0] / sum(sex_ratio_fm)))
+            num_male_haps = n_haps - num_female_haps
 
-    # Sample down to n_haps extant nodes per population.
+            # Separate extant males and females.
+            def get_sex_of_nodes(node_ids):
+                individuals = [ts.node(n).individual for n in node_ids]
+                female_bool = [ts.individual(i).metadata.sex == pyslim.INDIVIDUAL_TYPE_FEMALE
+                               for i in individuals]
+                return np.asarray(female_bool)
+
+            sex_bool = get_sex_of_nodes(all_samps)
+            females = all_samps[sex_bool]
+            males = all_samps[~sex_bool]
+            # Sample randomly from each sex.
+            if num_female_haps > len(females):
+                warnings.warn("Trying to sample more extant female nodes than exist.")
+                print(f"Sampling {len(females)} female nodes, rather than requested {num_female_haps}.")
+                female_samps = females
+            else:
+                female_samps = np.random.choice(females, size=num_female_haps, replace=False)
+            if num_male_haps > len(males):
+                warnings.warn("Trying to sample more extant male nodes than exist.")
+                print(f"Sampling {len(males)} male nodes, rather than requested {num_male_haps}.")
+                male_samps = males
+            else:
+                male_samps = np.random.choice(males, size=num_male_haps, replace=False)
+            sample_of_samps = np.append(female_samps, male_samps)
+        else:
+            sample_of_samps = np.random.choice(all_samps, size=n_haps, replace=False)
+        return sample_of_samps
+
     # TODO: should I be sampling individuals and keeping both their nodes?
     # Perhaps not if I want to do same for sex chromosomes.
-    extant_samples = np.concatenate((sample_extant_haplotypes(ts_popn_ids[0], n_haps),
-                                    sample_extant_haplotypes(ts_popn_ids[1], n_haps),
-                                    sample_extant_haplotypes(ts_popn_ids[2], n_haps)))
+    extant_samples = np.concatenate((sample_extant_haplotypes(ts_popn_ids[0],
+                                                              n_haps,
+                                                              sex_ratio_fm),
+                                    sample_extant_haplotypes(ts_popn_ids[1],
+                                                             n_haps,
+                                                             sex_ratio_fm),
+                                    sample_extant_haplotypes(ts_popn_ids[2],
+                                                             n_haps,
+                                                             sex_ratio_fm)))
     # Reduce ts to only these samples so the matrix isn't too big.
     # "In the returned tree sequence, the node with ID 0 corresponds to samples[0],
     # node 1 corresponds to samples[1], and so on.  Besides the samples, node IDs
