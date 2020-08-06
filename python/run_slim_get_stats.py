@@ -526,7 +526,7 @@ if __name__ == '__main__':
     num_reps = 1
 
     # Set directories
-    dir_stem = "/users/egibso10/demogSP20/HeterosisAIScripts/"
+    dir_stem = "/users/egibso10/data/egibso10/HeterosisAIScripts"
     DIR_region = dir_stem + "regions/"
     DIR_out = dir_stem + "output/out/"
     DIR_tree = dir_stem + "output/trees/"
