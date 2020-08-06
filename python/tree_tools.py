@@ -11,12 +11,14 @@ import msprime
 import numpy as np
 
 #%%
-def throw_neutral_muts(tree_file, region_info_file, neu_or_neg=0,
+def process_treeseq(tree_file, region_info_file, neu_or_neg=0, sex=None,
                                   n_scale=10, unif_recomb=False,
-                                  initial_Ne=10000, verbose=False):
+                                  initial_Ne=10000, verbose=False, mut_rate=1.5e-8):
     """
-    Recapitates .trees output from SLiM simulation and overlays neutral mutations.
-    Writes out new .trees file with the neutral mutations.
+    Recapitates .trees output from SLiM simulation and further processes:
+        Unless simulating the Xchr, we overlay neutral mutations using msprime.
+        If simulating the Xchr, we simplify to remove all Y chromosomes.
+    Overwrites .trees file UNLESS tree_file has extension '.orig'
 
     Parameters
     ----------
@@ -37,7 +39,7 @@ def throw_neutral_muts(tree_file, region_info_file, neu_or_neg=0,
 
     Output
     ------
-    Writes out .trees file, recapitated, with neutral mutations overlayed.
+    Writes out .trees file, recapitated, with EITHER neutral mutations overlayed OR Y chr removed.
     Currently OVERWRITES the original .trees file UNLESS the original has ext '.orig'
 
     Returns
@@ -52,7 +54,7 @@ def throw_neutral_muts(tree_file, region_info_file, neu_or_neg=0,
     ## Set recombination map
     def make_region_recombination_map(region_filename):
         if unif_recomb:
-            recomb_map = msprime.RecombinationMap.uniform_map(slim_ts.sequence_length, 1e-9)
+            recomb_map = msprime.RecombinationMap.uniform_map(slim_ts.sequence_length, unif_recomb)
         else:
             positions = []
             rates = []
@@ -80,33 +82,36 @@ def throw_neutral_muts(tree_file, region_info_file, neu_or_neg=0,
     # why is default Ne=1?
     n_p1 = initial_Ne / n_scale
     recap_ts = slim_ts.recapitate(recombination_map=recomb_map, Ne=n_p1)
+    assert max([t.num_roots for t in recap_ts.trees()]) == 1
     # TODO: decide about simplifying here?  Essentially sampling here.
     # How does the simplifying default to SLiM tree writing figure in?
     # I think this depends on how statistics are calculated
 
-    ## Throw mutations and output
-    # TODO: Wait for mutationMaps to magically appear?
-    # Need mutation rate variation to ensure equal density of mutations along chromosome
-    # Mutation rate maps are coming to msprime... I think they're already implemented but not doc'd.
-    # Should I use a development version of msprime?  Mine does not have the .MutationMap class.
-    # see: https://github.com/tskit-dev/msprime/pull/920 , also 902, 711
-    #       https://github.com/tskit-dev/msprime/blob/master/msprime/mutations.py line 700ish
-    # mutation rate scaling notes from SLiM sim code:
-    #   // exon uses a mixture of syn and nonsyn at a 1:2.31 ratio (Huber et al.)
-    # 	// to achieve an overall mutation rate of 1.5e-8, need 2.31/(1+2.31) fraction of all muts to be nonsyn
-    # 	// i.e. ~0.6979 fraction of all muts should be the deleterious ones simulated here as "m1".
-    # 	// the remaining ~0.3021 fraction of all mut.s should be thrown later as neutrals.
-    # HOWEVER, this logic applies if we were only simulating exon regions.
+    if sex == 'X':
+        # simplify to remove y chromosomes
+        xchrs = [recap_ts.node(s).id for s in recap_ts.samples()
+                 if recap_ts.node(s).metadata.genome_type == 1]
+        ts = recap_ts.simplify(samples=xchrs)
+    else:
+        ## Throw mutations
+        # TODO: Wait for mutationMaps to magically appear?
+        # Need mutation rate variation to ensure equal density of mutations along chromosome
+        # Mutation rate maps are coming to msprime... I think they're already implemented but not doc'd.
+        # Should I use a development version of msprime?  Mine does not have the .MutationMap class.
+        # see: https://github.com/tskit-dev/msprime/pull/920 , also 902, 711
+        #       https://github.com/tskit-dev/msprime/blob/master/msprime/mutations.py line 700ish
+        # mutation rate scaling notes from SLiM sim code:
+        #   // exon uses a mixture of syn and nonsyn at a 1:2.31 ratio (Huber et al.)
+        # 	// to achieve an overall mutation rate of 1.5e-8, need 2.31/(1+2.31) fraction of all muts to be nonsyn
+        # 	// i.e. ~0.6979 fraction of all muts should be the deleterious ones simulated here as "m1".
+        # 	// the remaining ~0.3021 fraction of all mut.s should be thrown later as neutrals.
+        # HOWEVER, this logic applies if we were only simulating exon regions.
+        mut_rate *= n_scale  # fine for neutral model;  will over-mutate exonic regions in neg
+        if neu_or_neg != 2:  # "negative" model of recessive deleterious var.
+            mut_rate *= 1 / (1 + 2.31)  # will under-mutate non-exons
+        ts = pyslim.SlimTreeSequence(msprime.mutate(recap_ts, rate=mut_rate, keep=True))
 
-    # TODO: set base mutation rate by variable?
-    mut_rate = 1.5e-8 * n_scale  # fine for neutral model;  will over-mutate exonic regions in neg
-    if neu_or_neg == 0:  # meaning the "neg" model of recessive deleterious var.
-        mut_rate *= 1 / (1 + 2.31)  # will under-mutate non-exons
-
-    ts = pyslim.SlimTreeSequence(msprime.mutate(recap_ts, rate=mut_rate, keep=True))
-    # check that we've correctly recap'd
-    assert max([t.num_roots for t in ts.trees()]) == 1
-
+    ## Write out .trees file
     # default is still to overwrite...
     out_name = tree_file
     # ... unless SLiM ts file has extension .orig
@@ -257,8 +262,9 @@ def calc_ancestry_frac(ts, source_popn, recip_popn, time_since_adm):
         chromosome intervals (start, end) to which ancestry fractions correspond.
 
     """
-    # check that the populations exist as expected in the original, recaped tree
-    assert (source_popn, recip_popn) == translate_from_slim_pop(ts, (source_popn, recip_popn))
+    # Don't check this any more because X chr treeseqs get simplified at recap
+    # # check that the populations exist as expected in the original, recaped tree
+    # assert (source_popn, recip_popn) == translate_from_slim_pop(ts, (source_popn, recip_popn))
 
     # check that we got the recapitated treeseq
     assert max(t.num_roots for t in ts.trees()) == 1
