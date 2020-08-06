@@ -69,7 +69,7 @@ initialize() {
 			target = sample(p1.genomes, 1);
 		}
 		target.addNewDrawnMutation(m4, 2500000 );
-		sim.treeSeqOutput("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/tmp/" + simnum + ".txt");
+		sim.treeSeqOutput("//users/egibso10/data/egibso10/HeterosisAIScripts/output/tmp/" + simnum + ".txt");
 	}
 }
 10010: late() {
@@ -82,7 +82,7 @@ initialize() {
 			}
 		}
 		else {
-			sim.readFromPopulationFile("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/output/tmp/" + simnum + ".txt");
+			sim.readFromPopulationFile("/users/egibso10/data/egibso10/HeterosisAIScripts/output/tmp/" + simnum + ".txt");
 			setSeed(getSeed() + 1);
 			target = sample(p1.genomes, 1);
 //			while (target.isNullGenome) {  // In X-chr simulation, we've chosen a Y-chr placeholder
