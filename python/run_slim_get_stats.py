@@ -526,10 +526,11 @@ if __name__ == '__main__':
     num_reps = 1
 
     # Set directories
-    dir_stem = "/users/egibso10/data/egibso10/HeterosisAIScripts"
+    dir_stem = "/users/egibso10/data/egibso10/HeterosisAIScripts/"
     DIR_region = dir_stem + "regions/"
     DIR_out = dir_stem + "output/out/"
     DIR_tree = dir_stem + "output/trees/"
+    DIR_stats = dir_stem + "output/stats/"
     DIR_par = dir_stem + "slim/"
 
     # Collect info about region
@@ -549,7 +550,7 @@ if __name__ == '__main__':
     # Run simulations and calculate statistics
     attempt_num = np.random.randint(5000)
     print(attempt_num)
-    windowfile_name = dir_stem + "output/stats/20200806/" + region_name + "-dominance" + str(dominance) + "-model" + str(model) + "-sex" + str(sex) + "-hs" + str(hs) + "-ai" + str(m4s) + '-attempt' + str(attempt_num) + '_human_windows.txt'
+    windowfile_name = DIR_stats + "20200806_females/" + region_name + "-dominance" + str(dominance) + "-model" + str(model) + "-sex" + str(sex) + "-hs" + str(hs) + "-ai" + str(m4s) + '-attempt' + str(attempt_num) + '_human_windows.txt'
     new_par = DIR_par + "par_" + region_name + '_m' + str(model) + '_sex' + str(sex) + '_' + str(dominance) + ".txt"
 
     num_proc = 10
