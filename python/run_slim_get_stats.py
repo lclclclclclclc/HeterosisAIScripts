@@ -480,9 +480,9 @@ def run_slim_variable(n, q, attempt_num, dominance, nscale, m4s, model, growth, 
     q.put([n, insert_ai, growth, mean_source_anc, anc_windows, anc_by_window, pos_start, pos_end, Dstat_list, fD_list, Het_list, divratioavg_list, Q_1_100_q95_list, Q_1_100_q90_list, Q_1_100_max_list, U_1_0_100_list, U_1_20_100_list, U_1_50_100_list, U_1_80_100_list])
     #other parameter info are stored in the output file name
 
-    # os.system('rm '+slim_stdout)
-    # os.system('rm '+treepath)
-    # os.system('rm '+new_par)
+    os.system('rm ' + slim_stdout)
+    if n > 0:  # Only save the first SLiM script
+        os.system('rm ' + new_par)
 
 
 def write_to_file(windowfile_name, q):
