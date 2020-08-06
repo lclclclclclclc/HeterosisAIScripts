@@ -285,7 +285,6 @@ def calc_stats(ts, sample_size, num_windows=100):
 def update_par_file(temp_par, new_par, model, growth, dominance,
                     nscale, m4s, hs, insert_ai, sex, uniform_recombination,
                     trees_filename, region_filename):
-
     oldfile = open(temp_par)
     newfile = open(new_par, 'w')
     line_counter = 0
@@ -341,7 +340,7 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
             elif line_counter == reg_line:  # region info file
                 fields[2] = 'readFile("' + region_filename + '");'
             elif uniform_recombination and (line_counter == rec_line):
-                fields[1] = '1e-09'
+                fields[1] = str(uniform_recombination)
                 fields[3] = '); //'
             elif line_counter == sex_line:  # initializeSex
                 if sex is None:  # comment out the call
@@ -400,8 +399,9 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
     oldfile.close()
 
 
-def run_slim_variable(n, q, attempt_num, dominance, nscale, m4s, model, growth, hs,
-                      insert_ai, sex, uniform_recombination, control_sex_ratio):
+def run_slim_variable(n, q, attempt_num, dominance, nscale, m4s, model, growth,
+                      hs, insert_ai, sex, uniform_recombination,
+                      control_sex_ratio):
 
     # set filenames
     trees_filename = dir_stem + 'output/trees/' + region_name + "-dominance" + str(dominance) + "-model" + str(model) + "-sex" + str(sex) + "-hs" + str(hs) + "-ai" + str(m4s) + '-attempt' + str(attempt_num) + '-rep' + str(n) + '.trees'
