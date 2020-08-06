@@ -150,7 +150,7 @@ def calc_derived_freq(pop_hap):
 
 
 def calc_stats(ts, sample_size, num_windows=100):
-    (p1_hap, p2_hap, p3_hap), all_pos = tt.sample_population_haplotypes(ts, n_haps=int(sample_size))
+    (p1_hap, p2_hap, p3_hap), all_pos = tt.sample_population_haplotypes(ts, n_haps=int(sample_size), sex_ratio_fm=control_sex_ratio)
 
     len_genome = ts.sequence_length
     allpos_bin = np.linspace(0, len_genome, num_windows)  # windows of every 50kb
@@ -400,17 +400,13 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
     oldfile.close()
 
 
-def run_slim_variable(n, q, r, dominance, nscale, m4s, model, growth, hs,
-                      insert_ai, sex, uniform_recombination):
+def run_slim_variable(n, q, attempt_num, dominance, nscale, m4s, model, growth, hs,
+                      insert_ai, sex, uniform_recombination, control_sex_ratio):
 
     # set filenames
-    region_name = region_all[r]
-    region_info_filename = dir_stem + 'regions/sim_seq_info_' + str(region_name) + '.txt'
-    trees_filename = dir_stem + 'output/trees/' + str(region_name) + '_m' + str(model) + '_sex' + str(sex) + '.trees'
-    new_par = DIR_par + "par_" + region_name + '_m' + str(model) + '_sex' + str(sex) + '_' + str(dominance) + ".txt"
-
-# etc: why were these vales not used in writing par files????
-# TODO: send these to update_par_file
+    trees_filename = dir_stem + 'output/trees/' + region_name + "-dominance" + str(dominance) + "-model" + str(model) + "-sex" + str(sex) + "-hs" + str(hs) + "-ai" + str(m4s) + '-attempt' + str(attempt_num) + '-rep' + str(n) + '.trees'
+    # etc: why were these vales not used in writing par files????
+    # TODO: send these to update_par_file
     if model ==1:  # etc: not handling this model yet
         if dominance != 2:
             temp_par = dir_stem + "slim/modelh_neg.txt"
@@ -459,9 +455,8 @@ def run_slim_variable(n, q, r, dominance, nscale, m4s, model, growth, hs,
                     nscale, m4s, hs, insert_ai, sex, uniform_recombination,
                     trees_filename + '.orig', region_info_filename)
 
-    slim_stdout = DIR_out + 'OUT_' + region_name + str(sex) + str(m4s) + str(n) + ".txt"
-
     # Run the SLiM simulation!
+    slim_stdout = DIR_out + 'OUT_' + region_name + str(sex) + str(m4s) + str(n) + ".txt"
     os.system('slim %s > %s' % (new_par, slim_stdout))
 
     # Recapitate and process TreeSequence from SLiM:
@@ -471,7 +466,8 @@ def run_slim_variable(n, q, r, dominance, nscale, m4s, model, growth, hs,
     trees_from_slim = trees_filename + '.orig'
     ts = tt.process_treeseq(trees_from_slim, region_info_filename,
                             neu_or_neg=dominance, sex=sex, n_scale=nscale,
-                            unif_recomb=uniform_recombination, mut_rate=base_mut_rate)
+                            unif_recomb=uniform_recombination,
+                            mut_rate=base_mut_rate)
 
     # Calculate how much source ancestry is present in today's recipient popn
     mean_source_anc, source_anc_fracs, intervals = tt.calc_ancestry_frac(ts, source_popn, recip_popn, adm_gens_ago)
@@ -516,15 +512,18 @@ def write_to_file(windowfile_name, q):
 #################################################################################
 if __name__ == '__main__':
     # Set params.  (See parser defaults.)
-    sex = 'X'  # etc: sex param takes None, 'A', or 'X'
     whichgene = 15 + 10  # 15 was for project.  X is 25
+    sex = 'X'  # Takes None, 'A', or 'X'.
+    # Female:male sex ratio of haplotypes sampled for statistic calculations
+    #   TODO: not implemented for ancestry proportion or ancestry windows
+    control_sex_ratio = (1,)  # Set as False to leave random.
 
-    dominance = 0  # if 0, run the deleterious recessive model #if 2, run the neutral model
+    dominance = 0  # if 0, run the deleterious recessive model.  If 2, run the neutral model
     m4s = 0.01  # adaptive selection strength
     uniform_recombination = 1e-09
     base_mut_rate = 1.5e-8
 
-    nscale = 100  # define scaling factor
+    nscale = 10  # define scaling factor
     num_reps = 1  # number of simulations per region
 
     # Set directories
@@ -541,9 +540,9 @@ if __name__ == '__main__':
                   "sgcz", "sipa1l2", "slc16a11", "slc19a3", "slc5a10", "stat2", "tbx15",
                   "tlr1610", "tnfa1p3", "txn", 'X-0-5M']
     region_name = region_all[r]
-    region_info_file = DIR_region + "sim_seq_info_" + str(region_name) + ".txt"
+    region_info_filename = DIR_region + "sim_seq_info_" + str(region_name) + ".txt"
     # Find an exon in the middle-ish of the region...
-    window_start, window_end = find_ai_site(region_info_file)
+    window_start, window_end = find_ai_site(region_info_filename)
     # ...and put the AI variant in the middle of that exon.
     insert_ai = int((int(window_end) + int(window_start)) / 2)
 
@@ -551,6 +550,8 @@ if __name__ == '__main__':
     attempt_num = np.random.randint(5000)
     print(attempt_num)
     windowfile_name = dir_stem + "output/stats/20200806/" + region_name + "-dominance" + str(dominance) + "-model" + str(model) + "-sex" + str(sex) + "-hs" + str(hs) + "-ai" + str(m4s) + '-attempt' + str(attempt_num) + '_human_windows.txt'
+    new_par = DIR_par + "par_" + region_name + '_m' + str(model) + '_sex' + str(sex) + '_' + str(dominance) + ".txt"
+
     num_proc = 10
     manager = Manager()
     pool = Pool(processes=num_proc)
@@ -561,8 +562,9 @@ if __name__ == '__main__':
     for i in args_iterable:
         n = i[0]
         print(str(n))
-        run_slim_variable(i[0], i[1], r, dominance, nscale, m4s, model, growth,
-                          hs, insert_ai, sex, uniform_recombination)
+        run_slim_variable(i[0], i[1], attempt_num, dominance, nscale, m4s, model, growth,
+                          hs, insert_ai, sex, uniform_recombination,
+                          control_sex_ratio=control_sex_ratio)
 
     q.put('kill')
     pool.close()
