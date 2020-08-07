@@ -22,3 +22,5 @@ slim/tmp.out
 python/profiling/
 
 other/
+
+slurm/submissions/*.out

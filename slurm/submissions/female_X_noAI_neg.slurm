@@ -20,7 +20,7 @@
 # --- Start of slurm commands -----------
 
 # Request an hour of runtime:
-#SBATCH --time=2:00:00
+#SBATCH --time=1:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 # Use more memory (4GB):
@@ -28,7 +28,7 @@
 ##SBATCH -c 10
 
 # Specify a job name:
-#SBATCH -J heterosis_females
+#SBATCH -J female_X_noAI_neg
 
 # Specify an output file
 # %j is a special variable that is replaced by the JobID when 
@@ -42,4 +42,4 @@
 module load python/3.7.4 
 module load slim/3.3
 
-python3 
+python3 female_X_noAI_neg.py

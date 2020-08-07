@@ -1,9 +1,11 @@
+import sys
 import os
 import random
 import argparse
 import numpy as np
 from multiprocessing import Manager, Pool
 
+sys.path.append('/users/egibso10/data/egibso10/HeterosisAIScripts/python/')
 import tree_tools as tt  # etc
 
 #!/usr/bin/env python3
@@ -522,8 +524,8 @@ if __name__ == '__main__':
     uniform_recombination = 1e-09  # Set as False to use region recombination map.
     base_mut_rate = 1.5e-8
 
-    nscale = 100
-    num_reps = 1
+    nscale = 10
+    num_reps = 10
 
     # Set directories
     dir_stem = "/users/egibso10/data/egibso10/HeterosisAIScripts/"
