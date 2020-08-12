@@ -67,7 +67,7 @@ nscale = int(args.nscale_id)
 m4s = float(args.selcoeff_id / 100)  # convert s-index to s: 1 -> 0.01
 num_reps = int(args.numrep_id)
 
-#sample command: python3 run_slim_get_stats.py -g 1 -h 0 -m 1 -p 4 -d 0 -n 10 -s 1 -r 200
+# sample command: python3 run_slim_get_stats.py -g 1 -h 0 -m 1 -p 4 -d 0 -n 10 -s 1 -r 200
 
 
 # No earthly idea why this is implemented like this.
