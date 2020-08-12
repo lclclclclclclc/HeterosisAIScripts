@@ -19,3 +19,5 @@ slim/tmp.out
 python/__pycache__/tree_tools.cpython-37.pyc
 
 python/profiling/
+
+results/Xchr_check/

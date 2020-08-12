@@ -103,9 +103,11 @@ def twopack(null_data, null_pos, ai_data, ai_pos, stat_ind, chr_ax, cdf_ax,
 
     pass
 
+
 # threshX = [fD_thresh_X, u80_thresh_X]
 thresh = [fD_thresh, u80_thresh]
 thresh_neu = [fD_thresh_neu, u80_thresh_neu]
+
 
 def plot_stats(stat_inds, stat_names, thresholds, null_data, null_pos,
                ai_data, ai_pos):
@@ -113,7 +115,7 @@ def plot_stats(stat_inds, stat_names, thresholds, null_data, null_pos,
     linaxes = axes.ravel()
     for i in range(len(stat_inds)):
         twopack(null_data, null_pos, ai_data, ai_pos, stats2plot[i],
-                linaxes[i*2], linaxes[i*2+1], thresholds[i], thresholds[i])
+                linaxes[i * 2], linaxes[i * 2 + 1], thresholds[i], thresholds[i])
 
     for ax, row in zip(axes[:,0], stat_names):
         ax.set_ylabel(row, rotation=0, size='large')
