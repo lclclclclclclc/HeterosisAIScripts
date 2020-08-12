@@ -168,7 +168,7 @@ def translate_from_slim_pop(tree_seq, s_ids=None):
 
 
 def sample_population_haplotypes(ts, popn_ids=(1, 2, 3), sex_ratio_fm=False,
-                                 n_haps=100, check_loc=None):
+                                 n_haps=100, check_loc=None, return_ts_only=False):
     """
     Using a tree sequence, takes extant samples from three populations
     and generates both haplotype matrices (n_haps x [number of variants]) for each
@@ -250,6 +250,13 @@ def sample_population_haplotypes(ts, popn_ids=(1, 2, 3), sex_ratio_fm=False,
     # node 1 corresponds to samples[1], and so on.  Besides the samples, node IDs
     # in the returned tree sequence are then allocated sequentially in time order.
     sts = ts.simplify(samples=extant_samples, reduce_to_site_topology=True)
+
+    if return_ts_only:
+        print(f"For SLiM pop'n ids {popn_ids}, use {translate_from_slim_pop(sts, s_ids=popn_ids)}.")
+        if type(return_ts_only) is not str:
+            identifier = str(np.random.randint(999))
+            return_ts_only = '/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/results/tmp/extant-' + identifier + '.trees'
+        return sts.dump(return_ts_only)
 
     # Generate the haplotypes
     haplotype_matrix = sts.genotype_matrix()
