@@ -150,7 +150,9 @@ def calc_derived_freq(pop_hap):
 
 
 def calc_stats(ts, sample_size, num_windows=100):
-    (p1_hap, p2_hap, p3_hap), all_pos = tt.sample_population_haplotypes(ts, n_haps=int(sample_size), sex_ratio_fm=control_sex_ratio)
+    (p1_hap, p2_hap, p3_hap), all_pos = tt.sample_population_haplotypes(ts,
+                                                                        n_haps=int(sample_size),
+                                                                        sex_ratio_fm=sample_sex_ratio)
 
     len_genome = ts.sequence_length
     allpos_bin = np.linspace(0, len_genome, num_windows)  # windows of every 50kb
@@ -284,7 +286,7 @@ def calc_stats(ts, sample_size, num_windows=100):
 
 def update_par_file(temp_par, new_par, model, growth, dominance,
                     nscale, m4s, hs, insert_ai, sex, uniform_recombination,
-                    trees_filename, region_filename):
+                    trees_filename, region_filename, female_introg_frac):
     oldfile = open(temp_par)
     newfile = open(new_par, 'w')
     line_counter = 0
@@ -293,7 +295,7 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
 
         if model == 0:  # etc: only implementing m0 rn
             # Set line numbers to change
-            sim_lines = [40, 43, 47, 53, 57, 73, 78, 81, 85, 90, 96, 97]
+            sim_lines = [33, 61, 64, 68, 74, 78, 94, 99, 102, 106, 111, 117, 118]
             if dominance == 2:  # neutral model
                 reg_line, rec_line, sex_line = (15, 25, 28)
             elif sex == 'X':  # deleterious, Xchr
@@ -305,13 +307,15 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
             # Set content for simulation section (not initialization)
             # TODO: calculate timepoints using adm_gen and end_gen??
             if (dominance == 2) and (sex != 'X'):  # skip burn-in entirely
-                time_points = [2, 2,
+                time_points = [20000 / nscale,  # modifyChild at introgression
+                               2, 2,
                                100 / nscale + 2, 100 / nscale + 2,
                                10000 / nscale, 10000 / nscale,
                                20000 / nscale, 20000 / nscale,
                                30000 / nscale]
             else:  # need to burn in, set generations accordingly
-                time_points = [100000 / nscale, 100000 / nscale,
+                time_points = [120000 / nscale,  # modifyChild at introgression
+                               100000 / nscale, 100000 / nscale,
                                100 / nscale + 100000 / nscale, 100 / nscale + 100000 / nscale,
                                110000 / nscale, 110000 / nscale,
                                120000 / nscale, 120000 / nscale,
@@ -337,6 +341,8 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
                 fields[1] = str(nscale)
             elif line_counter == 3:
                 fields[1] = str(m4s)
+            elif line_counter == 4:
+                fields[1] = str(female_introg_frac)
             elif line_counter == reg_line:  # region info file
                 fields[2] = 'readFile("' + region_filename + '");'
             elif uniform_recombination and (line_counter == rec_line):
@@ -511,11 +517,13 @@ def write_to_file(windowfile_name, q):
 #################################################################################
 if __name__ == '__main__':
     # Set params.  (See parser defaults.)
-    whichgene = 15 + 10  # 15 was for project.  X is 25
+    whichgene = 15 + 10 - 5  # 15 was for project.  X is 25
     sex = 'X'  # Takes None, 'A', or 'X'.
     # Female:male sex ratio of haplotypes sampled for statistic calculations
     #   TODO: not implemented for ancestry proportion or ancestry windows
-    control_sex_ratio = (1,)  # Set as False to leave random.
+    sample_sex_ratio = False  # (1,)  # Set as False to leave random.
+    # Sex bias of introgressors.
+    female_introg_frac = 0.5
 
     dominance = 0  # if 0, run the deleterious recessive model. If 2, run the neutral model
     m4s = 0  # adaptive selection strength.  Set as 0 for no adaptive introg.
@@ -562,9 +570,9 @@ if __name__ == '__main__':
     for i in args_iterable:
         n = i[0]
         print(str(n))
-        run_slim_variable(i[0], i[1], attempt_num, dominance, nscale, m4s, model, growth,
-                          hs, insert_ai, sex, uniform_recombination,
-                          control_sex_ratio=control_sex_ratio)
+        run_slim_variable(i[0], i[1], attempt_num, dominance, nscale, m4s,
+                          model, growth, hs, insert_ai, sex,
+                          uniform_recombination, female_introg_frac)
 
     # Clean up
     q.put('kill')

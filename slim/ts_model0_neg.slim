@@ -3,6 +3,7 @@ initialize() {
 	defineConstant("n", 10 ); //scaling factor
 	defineConstant("m4s", 0.01 *n); //if m4s>0, adaptive introgression; else, deleterious null
 	defineConstant("total_mu", 1.5e-8 );
+	defineConstant("female_introg_frac", 0.5 )
 
 	// exon uses a mixture of syn and nonsyn at a 1:2.31 ratio (Huber et al.)
 	// to achieve an overall mutation rate of 1.5e-8, need 2.31/(1+2.31) fraction of all muts to be nonsyn
@@ -46,6 +47,25 @@ initialize() {
 	initializeSex( "A" ); // etc: spaces for ease of editing with line.split
 }
 
+12000 modifyChild(p1) {
+	if ((sourceSubpop == p1) & (subpop == p3)) {
+		if (parent1.sex == "H") {  // This is a non-sexual model.
+			return T;
+		}
+		male_frac = 1 - female_frac;
+		if (childIsFemale) {  // This is a daughter of migrants.
+			roll = sample( c(T, F), size=1, weights=c(female_frac, male_frac) );
+			return roll;
+		}
+		else {  // This is a son of migrants.
+			roll = sample( c(T, F), size=1, weights=c(male_frac, female_frac) );
+			return roll;
+		}
+	}
+	else {  // This child has local parents.
+		return T;
+	}
+}
 
 //burn in
 1 early() {

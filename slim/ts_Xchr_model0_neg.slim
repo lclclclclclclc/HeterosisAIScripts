@@ -1,9 +1,10 @@
 initialize() {
-	defineConstant("dominance", 0 ); //recessive = 0; additive = 0.5; 
+	defineConstant("dominance", 0 ); //recessive = 0; additive = 0.5;
 	defineConstant("n", 10 ); //scaling factor
 	defineConstant("m4s", 0.01 *n); //if m4s>0, adaptive introgression; else, deleterious null
 	defineConstant("total_mu", 1.5e-8 );
-	
+	defineConstant("female_introg_frac", 0.5 )
+
     initializeMutationRate(total_mu*n);
 	//nonsynonymous drawn from a DFE from Kim et al.
 	// importantly, SLiM computes the fitness of the heterozygote and homozygote as 1+sh and 1+s
@@ -11,12 +12,12 @@ initialize() {
     initializeMutationType("m1", dominance, "g", -0.01314833*n, 0.186);
 	//synonymous -- assumed neutral here
 	initializeMutationType("m2", 0.5, "f", 0.0);
-	initializeMutationType("m4", 0.5, "f", m4s); //adaptive 	
+	initializeMutationType("m4", 0.5, "f", m4s); //adaptive
 	//genomic element: exon and uses a mixture of syn and nonsyn at a 1:2.31 ratio (Huber et al.)
 	initializeGenomicElementType("g1", c(m2,m1), c(1.0,2.31));
 	//genomic element: not an exon
-	initializeGenomicElementType("g2", c(m2), c(1.0));	
-    
+	initializeGenomicElementType("g2", c(m2), c(1.0));
+
     //read in exon and recomb info
     info_lines = readFile("/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/regions/sim_seq_info_X-0-5M.txt");
 	//recombination
@@ -51,7 +52,25 @@ initialize() {
     initializeSex( "X" );  // etc: spaces for ease of editing with line.split
 }
 
-
+12000 modifyChild(p1) {
+	if ((sourceSubpop == p1) & (subpop == p3)) {
+		if (parent1.sex == "H") {  // This is a non-sexual model.
+			return T;
+		}
+		male_frac = 1 - female_frac;
+		if (childIsFemale) {  // This is a daughter of migrants.
+			roll = sample( c(T, F), size=1, weights=c(female_frac, male_frac) );
+			return roll;
+		}
+		else {  // This is a son of migrants.
+			roll = sample( c(T, F), size=1, weights=c(male_frac, female_frac) );
+			return roll;
+		}
+	}
+	else {  // This child has local parents.
+		return T;
+	}
+}
 
 //burn in
 1 early() {
