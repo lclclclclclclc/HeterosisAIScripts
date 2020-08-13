@@ -316,17 +316,17 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
                                110000 / nscale, 110000 / nscale,
                                120000 / nscale, 120000 / nscale,
                                130000 / nscale]
-            time_points.insert(3, insert_ai)
-            time_points.insert(5, insert_ai)
+            ai_position_idxes = (4, 6)
+            time_points.insert(ai_position_idxes[0], insert_ai)
+            time_points.insert(ai_position_idxes[1], insert_ai)
             sim_content = [str(int(i)) for i in time_points]
-            sim_content[4] += ':'
+            sim_content[ai_position_idxes[0]] += ':'
             sim_content.extend(['sim.treeSeqOutput("' + trees_filename + '");'])
             assert len(sim_lines) == len(sim_content)
-            assert len(sim_lines) == 12
             # Write changes for simulation part
             if line_counter in sim_lines:
                 idx = sim_lines.index(line_counter)
-                if idx in [3, 5]:  # this is an insert_ai for field 1
+                if idx in ai_position_idxes:  # this is an insert_ai for field 1
                     fields[1] = sim_content[idx]
                 else:
                     fields[0] = sim_content[idx]
