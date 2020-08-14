@@ -3,6 +3,7 @@ initialize() {
 	defineConstant("n", 10 ); // scaling factor
 	defineConstant("m4s", 0.01 *n); // if m4s>0, adaptive introgression; else, deleterious null
 	defineConstant("total_mu", 1.5e-8 );
+	defineConstant("female_frac", 0.5 );	
     
     initializeMutationRate(total_mu*n);
     initializeMutationType("m1", 0.5, "f", 0);
@@ -29,6 +30,25 @@ initialize() {
     initializeSex( "X" );  // etc: spaces for ease of editing with line.split
 }
 
+12000 modifyChild(p1) {
+	if ((sourceSubpop == p1) & (subpop == p3)) {
+		if (parent1.sex == "H") {  // This is a non-sexual model.
+			return T;
+		}
+		male_frac = 1 - female_frac;
+		if (childIsFemale) {  // This is a daughter of migrants.
+			roll = sample( c(T, F), size=1, weights=c(female_frac, male_frac) );
+			return roll;
+		}
+		else {  // This is a son of migrants.
+			roll = sample( c(T, F), size=1, weights=c(male_frac, female_frac) );
+			return roll;
+		}
+	}
+	else {  // This child has local parents.
+		return T;
+	}
+}
 
 //burn in
 1 early() {
@@ -86,7 +106,7 @@ initialize() {
 12000 early(){
 	sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
 	p1.setMigrationRates(p3, 0.00); //migration rate INTO p1
-	p3.setMigrationRates(p1, 0.1); //migration rate INTO p3
+	p3.setMigrationRates(p1, 0.1 * 2); //migration rate INTO p3
 }
 12000 late(){
 	sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
