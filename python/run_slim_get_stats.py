@@ -292,18 +292,23 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
     line_counter = 0
     for line_counter, line in enumerate(oldfile):
         fields = line.split()
-
+        # print(str(line_counter) + ': ' + line)
         if model == 0:  # etc: only implementing m0 rn
             # Set line numbers to change
             sim_lines = [33, 61, 64, 68, 74, 78, 94, 99, 102, 106, 111, 117, 118]
             if dominance == 2:  # neutral model
-                reg_line, rec_line, sex_line = (15, 25, 28)
+                reg_line, rec_line, sex_line = (17, 27, 30)
             elif sex == 'X':  # deleterious, Xchr
-                sim_lines = [ln + 23 for ln in sim_lines]
-                reg_line, rec_line, sex_line = (20, 31, 50)
+                sim_lines = [ln + 22 for ln in sim_lines]
+                reg_line, rec_line, sex_line = (22, 33, 52)
             else:  # deleterious, A or None
                 sim_lines = [ln + 17 for ln in sim_lines]
-                reg_line, rec_line, sex_line = (23, 34, 45)
+                reg_line, rec_line, sex_line = (25, 36, 47)
+            # Translate from editor line numbers to line_counter
+            sim_lines = [ln - 1 for ln in sim_lines]
+            reg_line -= 1
+            rec_line -= 1
+            sex_line -= 1
             # Set content for simulation section (not initialization)
             # TODO: calculate timepoints using adm_gen and end_gen??
             if (dominance == 2) and (sex != 'X'):  # skip burn-in entirely
@@ -324,7 +329,7 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
             time_points.insert(ai_position_idxes[0], insert_ai)
             time_points.insert(ai_position_idxes[1], insert_ai)
             sim_content = [str(int(i)) for i in time_points]
-            sim_content[ai_position_idxes[0]] += ':'
+            sim_content[ai_position_idxes[0] + 1] += ':'  # loop to check on ai
             sim_content.extend(['sim.treeSeqOutput("' + trees_filename + '");'])
             assert len(sim_lines) == len(sim_content)
             # Write changes for simulation part
@@ -342,6 +347,8 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
             elif line_counter == 3:
                 fields[1] = str(m4s)
             elif line_counter == 4:
+                fields[1] = str(base_mut_rate)
+            elif line_counter == 5:
                 fields[1] = str(female_introg_frac)
             elif line_counter == reg_line:  # region info file
                 fields[2] = 'readFile("' + region_filename + '");'
@@ -400,7 +407,7 @@ def update_par_file(temp_par, new_par, model, growth, dominance,
         for item in fields:
             new_line = new_line + item + " "
         newfile.write(new_line + '\n')
-
+        # print(new_line)
     newfile.close()
     oldfile.close()
 
@@ -459,7 +466,8 @@ def run_slim_variable(n, q, attempt_num, dominance, nscale, m4s, model, growth,
 
     update_par_file(temp_par, new_par, model, growth, dominance,
                     nscale, m4s, hs, insert_ai, sex, uniform_recombination,
-                    trees_filename + '.orig', region_info_filename)
+                    trees_filename + '.orig', region_info_filename,
+                    female_introg_frac)
 
     # Run the SLiM simulation!
     slim_stdout = DIR_out + 'OUT_' + region_name + str(sex) + str(m4s) + str(n) + ".txt"
@@ -476,7 +484,10 @@ def run_slim_variable(n, q, attempt_num, dominance, nscale, m4s, model, growth,
                             mut_rate=base_mut_rate)
 
     # Calculate how much source ancestry is present in today's recipient popn
-    mean_source_anc, source_anc_fracs, intervals = tt.calc_ancestry_frac(ts, source_popn, recip_popn, adm_gens_ago)
+    mean_source_anc, source_anc_fracs, intervals = tt.calc_ancestry_frac(ts,
+                                                                         source_popn,
+                                                                         recip_popn,
+                                                                         adm_gens_ago)
     # Mean ancestry per 50kb window
     anc_by_window, anc_windows = calc_ancestry_window(source_anc_fracs, intervals)
 
@@ -484,7 +495,7 @@ def run_slim_variable(n, q, attempt_num, dominance, nscale, m4s, model, growth,
     pos_start, pos_end, Dstat_list, fD_list, Het_list, divratioavg_list, Q_1_100_q95_list, Q_1_100_q90_list, Q_1_100_max_list, U_1_0_100_list, U_1_20_100_list, U_1_50_100_list, U_1_80_100_list = calc_stats(ts, sample_size=popsize)
 
     q.put([n, insert_ai, growth, mean_source_anc, anc_windows, anc_by_window, pos_start, pos_end, Dstat_list, fD_list, Het_list, divratioavg_list, Q_1_100_q95_list, Q_1_100_q90_list, Q_1_100_max_list, U_1_0_100_list, U_1_20_100_list, U_1_50_100_list, U_1_80_100_list])
-    #other parameter info are stored in the output file name
+    # other parameter info are stored in the output file name
 
     os.system('rm ' + slim_stdout)
     if n > 0:  # Only save the first SLiM script
@@ -497,7 +508,10 @@ def write_to_file(windowfile_name, q):
         q_elem = q.get()
         if q_elem == 'kill':  # break if end of queue
             break
-        [n, insert_ai, growth, mean_source_anc, anc_windows, anc_by_window, pos_start, pos_end, Dstat_list, fD_list, Het_list, divratioavg_list, Q_1_100_q95_list, Q_1_100_q90_list, Q_1_100_max_list, U_1_0_100_list, U_1_20_100_list, U_1_50_100_list, U_1_80_100_list] = q_elem
+        [n, insert_ai, growth, mean_source_anc, anc_windows, anc_by_window,
+         pos_start, pos_end, Dstat_list, fD_list, Het_list, divratioavg_list,
+         Q_1_100_q95_list, Q_1_100_q90_list, Q_1_100_max_list, U_1_0_100_list,
+         U_1_20_100_list, U_1_50_100_list, U_1_80_100_list] = q_elem
         for i in range(len(Dstat_list)):
             format_string = "%d\t%d\t%d\t%f\t%d\t%d\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n"
             items_to_write = (n, insert_ai, growth, mean_source_anc, anc_windows[i][0], anc_windows[i][1], anc_by_window[i], pos_start[i], pos_end[i], Dstat_list[i], fD_list[i], Het_list[i], divratioavg_list[i], Q_1_100_q95_list[i], Q_1_100_q90_list[i], Q_1_100_max_list[i], U_1_0_100_list[i], U_1_20_100_list[i], U_1_50_100_list[i], U_1_80_100_list[i])
@@ -517,20 +531,20 @@ def write_to_file(windowfile_name, q):
 #################################################################################
 if __name__ == '__main__':
     # Set params.  (See parser defaults.)
-    whichgene = 15 + 10 - 5  # 15 was for project.  X is 25
-    sex = 'X'  # Takes None, 'A', or 'X'.
+    whichgene = 15 + 10  # 15 was for project.  X is 25
+    sex = None  # Takes None, 'A', or 'X'.
     # Female:male sex ratio of haplotypes sampled for statistic calculations
     #   TODO: not implemented for ancestry proportion or ancestry windows
     sample_sex_ratio = False  # (1,)  # Set as False to leave random.
-    # Sex bias of introgressors.
-    female_introg_frac = 0.5
+    # Sex bias of introgressors.  0.5 is equal numbers.
+    female_introg_frac = 0
 
-    dominance = 0  # if 0, run the deleterious recessive model. If 2, run the neutral model
-    m4s = 0  # adaptive selection strength.  Set as 0 for no adaptive introg.
+    dominance = 2  # if 0, run the deleterious recessive model. If 2, run the neutral model
+    m4s = 0.01  # adaptive selection strength.  Set as 0 for no adaptive introg.
     uniform_recombination = 1e-09  # Set as False to use region recombination map.
     base_mut_rate = 1.5e-8
 
-    nscale = 10
+    nscale = 100
     num_reps = 1
 
     # Set directories

@@ -3,7 +3,7 @@ initialize() {
 	defineConstant("n", 10 ); //scaling factor
 	defineConstant("m4s", 0.01 *n); //if m4s>0, adaptive introgression; else, deleterious null
 	defineConstant("total_mu", 1.5e-8 );
-	defineConstant("female_introg_frac", 0.5 )
+	defineConstant("female_frac", 0.5 );
 
 	// exon uses a mixture of syn and nonsyn at a 1:2.31 ratio (Huber et al.)
 	// to achieve an overall mutation rate of 1.5e-8, need 2.31/(1+2.31) fraction of all muts to be nonsyn
@@ -123,7 +123,7 @@ initialize() {
 12000 early(){
 	sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
 	p1.setMigrationRates(p3, 0.00); //migration rate INTO p1
-	p3.setMigrationRates(p1, 0.1); //migration rate INTO p3
+	p3.setMigrationRates(p1, 0.1 * 2); //migration rate INTO p3
 }
 12000 late(){
 	sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);

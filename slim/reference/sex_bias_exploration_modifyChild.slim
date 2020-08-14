@@ -6,7 +6,7 @@ initialize() {
 	initializeGenomicElementType("g1", m1, 1.0);
 	initializeGenomicElement(g1, 0, 99999);
 	initializeRecombinationRate(1e-8);
-	//initializeSex("A");
+	initializeSex("X");
 	
 	// fraction of introgressors to be female.
 	//		(no sex-bias is 0.5)
@@ -49,11 +49,10 @@ initialize() {
 }
 
 300 late() {
-
+	p3.setMigrationRates(p1, 0);
 	
 }
 
-300 {sim.simulationFinished();}
 
 301 {
 	num_female_introgs = size( p3.subsetIndividuals(sex = "F", migrant = T) );
