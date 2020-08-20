@@ -27,4 +27,4 @@ slim/.DS_Store
 
 other/
 
-slurm/submissions/*.out
+slurm/submissions/*

@@ -28,13 +28,13 @@
 ##SBATCH -c 10
 
 # Specify a job name:
-#SBATCH -J heterosis_females
+#SBATCH -J heterosis
 
 # Specify an output file
 # %j is a special variable that is replaced by the JobID when 
 # job starts
-#SBATCH -o heterosis_females-%j.out
-#SBATCH -e heterosis_females-%j.out
+#SBATCH -o het-%j.out
+#SBATCH -e het-%j.out
 
 #----- End of slurm commands ----
 
