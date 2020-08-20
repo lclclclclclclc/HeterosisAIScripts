@@ -1,0 +1,80 @@
+// Keywords: sexual, sex ratio
+
+initialize() {
+	initializeMutationRate(1e-7);
+	initializeMutationType("m1", 0.5, "f", 0.0);
+	initializeGenomicElementType("g1", m1, 1.0);
+	initializeGenomicElement(g1, 0, 99999);
+	initializeRecombinationRate(1e-8);
+	initializeSex("A");
+}
+1 { sim.addSubpop("p1", 500); }
+
+200 { sim.addSubpopSplit("p3", 100, p1); }
+
+300 early() {
+	p3.setMigrationRates(p1, 0.1);
+}
+
+300 {
+	
+	num_female_introgs = size( p3.subsetIndividuals(sex = "F", migrant = T) );
+	num_male_introgs = size( p3.subsetIndividuals(sex = "M", migrant = T) );
+	fm_ratio = c(num_female_introgs, num_male_introgs);
+	
+	cat( "Within an introgressor population of " );
+	print( num_female_introgs + num_male_introgs );
+	cat( "we achieved an introgressor F:M sex ratio of " );
+	print( fm_ratio );
+
+}
+
+300 late() {
+	p3.setMigrationRates(p1, 0);
+	
+	num_female_introgs = size( p3.subsetIndividuals(sex = "F", migrant = T) );
+	num_male_introgs = size( p3.subsetIndividuals(sex = "M", migrant = T) );
+	fm_ratio = c(num_female_introgs, num_male_introgs);
+	
+	cat( "Within an introgressor population of " );
+	print( num_female_introgs + num_male_introgs );
+	cat( "we achieved an introgressor F:M sex ratio of " );
+	print( fm_ratio );
+
+	
+}
+
+301 mateChoice(p3) {
+	if (individual.migrant) {
+		print("A female migrant is choosing a mate.");
+		return float(0)
+	}
+
+	else {
+		return NULL;
+	}
+}
+
+301 {
+	num_female_introgs = size( p3.subsetIndividuals(sex = "F", migrant = T) );
+	num_male_introgs = size( p3.subsetIndividuals(sex = "M", migrant = T) );
+	fm_ratio = c(num_female_introgs, num_male_introgs);
+	
+	cat( "Within an introgressor population of " );
+	print( num_female_introgs + num_male_introgs );
+	cat( "we achieved an introgressor F:M sex ratio of " );
+	print( fm_ratio );
+}
+
+301 late() {
+	num_female_introgs = size( p3.subsetIndividuals(sex = "F", migrant = T) );
+	num_male_introgs = size( p3.subsetIndividuals(sex = "M", migrant = T) );
+	fm_ratio = c(num_female_introgs, num_male_introgs);
+	
+	cat( "Within an introgressor population of " );
+	print( num_female_introgs + num_male_introgs );
+	cat( "we achieved an introgressor F:M sex ratio of " );
+	print( fm_ratio );
+}
+
+302 { sim.simulationFinished(); }

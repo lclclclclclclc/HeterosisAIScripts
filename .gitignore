@@ -21,6 +21,10 @@ slim/tmp.out
 
 python/profiling/
 
+results/Xchr_check/
+
+slim/.DS_Store
+
 other/
 
 slurm/submissions/*.out
