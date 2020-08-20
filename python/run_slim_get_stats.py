@@ -1,9 +1,11 @@
+import sys
 import os
 import random
 import argparse
 import numpy as np
 from multiprocessing import Manager, Pool
 
+sys.path.append('/Users/egibson/Documents/science/Grad/demog20/proj/HeterosisAIScripts/python/')
 import tree_tools as tt  # etc
 
 #!/usr/bin/env python3
